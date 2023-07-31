@@ -21,23 +21,44 @@ class ClassDefinitionGenerator {
           generateClass(name, obj)
         case (name, obj: OpenapiSchemaEnum) =>
           generateEnum(name, obj, targetScala3)
-        case _ => throw new NotImplementedError("Only objects and enums supported!")
+        case (name, OpenapiSchemaMap(valueSchema, _)) => generateMap(name, valueSchema)
+        case (n, x) => throw new NotImplementedError(s"Only objects and enums supported! (for $n found ${x})")
       })
       .map(_.mkString("\n"))
   }
 
+  private[codegen] def generateMap(name: String, valueSchema: OpenapiSchemaType): Seq[String] = {
+    val valueSchemaName = valueSchema match {
+      case OpenapiSchemaType.OpenapiSchemaBoolean(_) => "Boolean"
+    }
+    Seq(s"""type $name = Map[String, $valueSchemaName]""")
+  }
+
   // Uses enumeratum for scala 2, but generates scala 3 enums instead where it can
-  private[codegen] def generateEnum(name: String, obj: OpenapiSchemaEnum, targetScala3: Boolean): Seq[String] = if (targetScala3) {
-    s"""enum $name {
-       |  case ${obj.items.map(_.value).mkString(", ")}
-       |}""".stripMargin :: Nil
-  } else {
-    val members = obj.items.map { i => s"case object ${i.value} extends $name" }
-    s"""|sealed trait $name extends EnumEntry
-        |object $name extends Enum[$name] {
-        |  val values = findValues
-        |${indent(2)(members.mkString("\n"))}
-        |}""".stripMargin :: Nil
+  private[codegen] def generateEnum(name: String, obj: OpenapiSchemaEnum, targetScala3: Boolean): Seq[String] = {
+    val hasIllegalChar = ".*[^0-9a-zA-Z$_].*".r
+    def toLegalName(s: String): String = if (hasIllegalChar.findFirstIn(s).isDefined) s"`$s`" else s
+    val legalName = toLegalName(name)
+    if (targetScala3) {
+      s"""enum $legalName {
+         |  case ${obj.items.map(i => toLegalName(i.value)).mkString(", ")}
+         |}
+         |implicit lazy val ${legalName}PlainCodec: Codec.PlainCodec[$legalName] =
+         |  Codec.string.map($legalName.valueOf(_))(_.toString)
+         |implicit lazy val ${legalName}JsonCodec: Codec.JsonCodec[$legalName] =
+         |  Codec.json(s => scala.util.Try($legalName.valueOf(s)).fold(t => DecodeResult.Error(s, t), DecodeResult.Value(_)))(_.toString)""".stripMargin :: Nil
+    } else {
+      val members = obj.items.map { i => s"case object ${toLegalName(i.value)} extends $legalName" }
+      s"""|sealed trait $legalName extends EnumEntry
+          |object $legalName extends Enum[$legalName] with CirceEnum[$legalName] {
+          |  val values = findValues
+          |${indent(2)(members.mkString("\n"))}
+          |}
+          |implicit lazy val ${legalName}PlainCodec: Codec.PlainCodec[$legalName] =
+          |  Codec.string.map($legalName.withName(_))(_.entryName)
+          |implicit lazy val ${legalName}JsonCodec: Codec.JsonCodec[$legalName] =
+          |  Codec.json(s => scala.util.Try($legalName.withName(s)).fold(t => DecodeResult.Error(s, t), DecodeResult.Value(_)))(_.entryName)""".stripMargin :: Nil
+    }
   }
 
   private[codegen] def generateClass(name: String, obj: OpenapiSchemaObject): Seq[String] = {
@@ -59,15 +80,30 @@ class ClassDefinitionGenerator {
         .flatten
         .toList
 
-      val properties = obj.properties.map { case (key, schemaType) =>
+      val (fieldNames, properties) = obj.properties.map { case (key, schemaType) =>
         val tpe = mapSchemaTypeToType(name, key, obj.required.contains(key), schemaType)
         val fixedKey = fixKey(key)
-        s"$fixedKey: $tpe"
-      }
+        fixedKey -> s"$fixedKey: $tpe"
+      }.unzip
+      val fieldCount = fieldNames.size
+      val fieldNamesString = fieldNames.map('"' +: _ :+ '"').mkString(", ")
+      val fieldAccessString = fieldNames.map("x." + _).mkString(", ")
+      val explicitCodecs = if (fieldCount > 22)
+        s"""object $name {
+           |  implicit lazy val decode$name: Decoder[$name] = deriveDecoder[$name]
+           |  implicit lazy val encode$name: Encoder[$name] = deriveEncoder[$name]
+           |}""".stripMargin else
+        s"""implicit lazy val decode$name: Decoder[$name] =
+           |  Decoder.forProduct$fieldCount($fieldNamesString)($name.apply)
+           |implicit lazy val encode$name: Encoder[$name] =
+           |  Encoder.forProduct$fieldCount($fieldNamesString)(x =>
+           |    ($fieldAccessString)
+           |  )""".stripMargin
 
       s"""|case class $name (
           |${indent(2)(properties.mkString(",\n"))}
-          |)""".stripMargin :: innerClasses ::: acc
+          |)
+          |$explicitCodecs""".stripMargin :: innerClasses ::: acc
     }
 
     rec(addName("", name), obj, Nil)

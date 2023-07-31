@@ -42,7 +42,8 @@ object BasicGenerator {
     """import sttp.tapir._
       |import sttp.tapir.json.circe._
       |import sttp.tapir.generic.auto._
-      |import io.circe.generic.auto._
+      |import io.circe.generic.semiauto._ // only required for case classes with > 22 fields
+      |import io.circe.{ Decoder, Encoder }
       |""".stripMargin
 
   def indent(i: Int)(str: String): String = {
@@ -67,7 +68,7 @@ object BasicGenerator {
         ("Boolean", nb)
       case OpenapiSchemaRef(t) =>
         (t.split('/').last, false)
-      case _ => throw new NotImplementedError("Not all simple types supported!")
+      case x => throw new NotImplementedError(s"Not all simple types supported! Found $x")
     }
   }
 }

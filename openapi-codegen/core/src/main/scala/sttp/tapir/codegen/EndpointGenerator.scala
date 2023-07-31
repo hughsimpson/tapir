@@ -14,12 +14,12 @@ class EndpointGenerator {
     val ge = doc.paths.flatMap(generatedEndpoints(ps))
     val definitions = ge
       .map { case (name, definition) =>
-        s"""|val $name =
+        s"""|lazy val $name =
             |${indent(2)(definition)}
             |""".stripMargin
       }
       .mkString("\n")
-    val allEP = s"val $allEndpoints = List(${ge.map(_._1).mkString(", ")})"
+    val allEP = s"lazy val $allEndpoints = List(${ge.map(_._1).mkString(", ")})"
 
     s"""|$definitions
         |
@@ -82,7 +82,7 @@ class EndpointGenerator {
             val (t, _) = mapSchemaSimpleTypeToType(st)
             val desc = param.description.fold("")(d => s""".description("$d")""")
             s""".in(${param.in}[$t]("${param.name}")$desc)"""
-          case _ => throw new NotImplementedError("Can't create non-simple params to input")
+          case x => throw new NotImplementedError(s"Can't create non-simple params to input - found $x")
         }
       }
 
@@ -136,11 +136,11 @@ class EndpointGenerator {
           case OpenapiSchemaArray(st: OpenapiSchemaSimpleType, _) =>
             val (t, _) = mapSchemaSimpleTypeToType(st)
             s"List[$t]"
-          case _ => throw new NotImplementedError("Can't create non-simple or array params as output")
+          case x => throw new NotImplementedError(s"Can't create non-simple or array params as output (found $x)")
         }
         val req = if (required) outT else s"Option[$outT]"
         s"jsonBody[$req]"
-      case _ => throw new NotImplementedError("We only handle json and text!")
+      case x => throw new NotImplementedError(s"We only handle json and text! Found $x")
     }
   }
 
