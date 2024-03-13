@@ -167,4 +167,15 @@ class ModelParserSpec extends AnyFlatSpec with Matchers with Checkers {
       OpenapiSchemaEnum("string", Seq(OpenapiSchemaConstantString("paperback"), OpenapiSchemaConstantString("hardback")), false)
     )
   }
+
+  it should "parse endpoint with simple specification extensions" in {
+    val res = parser
+      .parse(TestHelpers.specificationExtensionYaml)
+      .leftMap(err => err: Error)
+      .flatMap(_.as[OpenapiDocument])
+
+    res shouldBe (Right(
+      TestHelpers.specificationExtensionDocs
+    ))
+  }
 }
