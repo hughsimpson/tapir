@@ -109,8 +109,9 @@ class EndpointGenerator {
           .collect { case queryParam: OpenapiParameter if queryParam.in == "query" => queryParam.schema }
           .collect { case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => ref.stripPrefix("#/components/schemas/") }
           .toSet
-        val jsonParamRefs = (m.requestBody.toSeq.flatMap(_.content) ++ m.responses.flatMap(_.content))
-          .collect { case content if content.contentType == "application/json" => content.schema }
+        val jsonParamRefs = (m.requestBody.toSeq.flatMap(_.content.map(c => (c.contentType, c.schema))) ++
+          m.responses.flatMap(_.content.map(c => (c.contentType, c.schema))))
+          .collect { case (contentType, schema) if contentType == "application/json" => schema }
           .collect { case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => ref.stripPrefix("#/components/schemas/") }
           .toSet
         ((maybeTargetFileName, (name, definition)), (queryParamRefs, jsonParamRefs))
