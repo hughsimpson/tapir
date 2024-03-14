@@ -88,7 +88,7 @@ class EndpointGenerator {
               |${indent(2)(outs(m.responses))}
               |${indent(2)(tags(m.tags))}
               |$attributeString
-              |""".stripMargin
+              |""".stripMargin.linesIterator.filterNot(_.trim.isEmpty).mkString("\n")
 
         val name = m.operationId
           .getOrElse(m.methodType + p.url.capitalize)
