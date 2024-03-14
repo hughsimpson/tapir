@@ -96,6 +96,12 @@ class ClassDefinitionGenerator {
       jsonParamRefs.toSeq.flatMap(ref => allSchemas.get(ref.stripPrefix("#/components/schemas/")))
     )
 
+    val maybeJsonSerdeHelpers =
+      if (jsonParamRefs.nonEmpty && jsonSerdeLib == JsonSerdeLib.Jsoniter)
+        """implicit def seqCodec[T: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec]: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[List[T]] =
+        |  com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make[List[T]]
+        |""".stripMargin
+      else ""
     val enumQuerySerdeHelper =
       if (!generatesQueryParamEnums) ""
       else if (targetScala3)
@@ -152,7 +158,7 @@ class ClassDefinitionGenerator {
         case (n, x) => throw new NotImplementedError(s"Only objects, enums and maps supported! (for $n found ${x})")
       })
       .map(_.mkString("\n"))
-    defns.map(enumQuerySerdeHelper + _)
+    defns.map(maybeJsonSerdeHelpers + enumQuerySerdeHelper + _)
   }
 
   private[codegen] def generateMap(

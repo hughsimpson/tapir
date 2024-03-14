@@ -1976,7 +1976,7 @@ lazy val openapiCodegenCore: ProjectMatrix = (projectMatrix in file("openapi-cod
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.28.2" % Provided
     )
   )
-  .dependsOn(core % Test, circeJson % Test)
+  .dependsOn(core % Test, circeJson % Test, jsoniterScala % Test)
 
 lazy val openapiCodegenSbt: ProjectMatrix = (projectMatrix in file("openapi-codegen/sbt-plugin"))
   .enablePlugins(SbtPlugin)
