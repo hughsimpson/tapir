@@ -123,6 +123,8 @@ class EndpointGenerator {
             case OpenapiSchemaArray(simple: OpenapiSchemaSimpleType, _) =>
               val name = BasicGenerator.mapSchemaSimpleTypeToType(simple)._1
               s"List[$name]"
+            case simple: OpenapiSchemaSimpleType =>
+              BasicGenerator.mapSchemaSimpleTypeToType(simple)._1
           }
           .toSet
         ((maybeTargetFileName, (name, definition)), (queryParamRefs, jsonParamRefs))

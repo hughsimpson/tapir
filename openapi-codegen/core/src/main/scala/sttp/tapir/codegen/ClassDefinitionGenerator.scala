@@ -100,6 +100,8 @@ class ClassDefinitionGenerator {
       if (jsonParamRefs.nonEmpty && jsonSerdeLib == JsonSerdeLib.Jsoniter)
         """implicit def seqCodec[T: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec]: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[List[T]] =
         |  com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make[List[T]]
+        |implicit def optionCodec[T: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec]: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[Option[T]] =
+        |  com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make[Option[T]]
         |""".stripMargin
       else ""
     val enumQuerySerdeHelper =
@@ -148,8 +150,8 @@ class ClassDefinitionGenerator {
           |        )
           |    )(_.entryName)
           |""".stripMargin
-    val seqSerdes = jsonParamRefs.toSeq
-      .filter(_ startsWith "List[")
+    val additionalExplicitSerdes = jsonParamRefs.toSeq
+      .filter(x => !allSchemas.contains(x))
       .map(s =>
         jsonSerdeLib match {
           case JsonSerdeLib.Jsoniter =>
@@ -170,7 +172,7 @@ class ClassDefinitionGenerator {
         case (n, x) => throw new NotImplementedError(s"Only objects, enums and maps supported! (for $n found ${x})")
       })
       .map(_.mkString("\n"))
-    defns.map(seqSerdes + maybeJsonSerdeHelpers + enumQuerySerdeHelper + _)
+    defns.map(additionalExplicitSerdes + maybeJsonSerdeHelpers + enumQuerySerdeHelper + _)
   }
 
   private[codegen] def generateMap(
