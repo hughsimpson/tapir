@@ -188,7 +188,6 @@ class ClassDefinitionGenerator {
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
       jsonParamRefs: Set[String]
   ): Seq[String] = if (targetScala3) {
-    val maybeQueryParamSerdeDerivation = if (queryParamRefs contains name) ", enumextensions.EnumMirror" else ""
     val maybeCompanion =
       if (queryParamRefs contains name)
         s"""
