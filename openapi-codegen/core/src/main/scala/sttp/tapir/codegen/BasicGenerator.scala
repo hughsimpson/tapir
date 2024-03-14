@@ -83,7 +83,6 @@ object BasicGenerator {
         // Note: all schema models have explicit decoders and encoders defined using semiauto; however, it can happen
         // that other types are pulled into
         """import sttp.tapir.json.circe._
-          |import io.circe.generic.auto._
           |import io.circe.generic.semiauto._""".stripMargin
       case JsonSerdeLib.Jsoniter =>
         """import sttp.tapir.json.jsoniter._
