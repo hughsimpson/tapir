@@ -10,7 +10,8 @@ class BasicGeneratorSpec extends CompileCheckTestBase {
       "sttp.tapir.generated",
       "TapirGeneratedEndpoints",
       targetScala3 = false,
-      useHeadTagForObjectNames = false
+      useHeadTagForObjectNames = false,
+      jsonSerdeLib = "circe"
     )("TapirGeneratedEndpoints") shouldCompile ()
   }
 
@@ -20,7 +21,8 @@ class BasicGeneratorSpec extends CompileCheckTestBase {
       "sttp.tapir.generated",
       "TapirGeneratedEndpoints",
       targetScala3 = false,
-      useHeadTagForObjectNames = true
+      useHeadTagForObjectNames = true,
+      jsonSerdeLib = "circe"
     )
     val schemas = generated("TapirGeneratedEndpoints")
     val endpoints = generated("Bookshop")
@@ -41,7 +43,8 @@ class BasicGeneratorSpec extends CompileCheckTestBase {
       "sttp.tapir.generated",
       "TapirGeneratedEndpoints",
       targetScala3 = false,
-      useHeadTagForObjectNames = false
+      useHeadTagForObjectNames = false,
+      jsonSerdeLib = "circe"
     )("TapirGeneratedEndpoints") shouldCompile ()
   }
 

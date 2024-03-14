@@ -21,14 +21,19 @@ case class Location(path: String, method: String) {
   override def toString: String = s"${method.toUpperCase} ${path}"
 }
 
-case class GeneratedEndpoints(namesAndBodies: Seq[(Option[String], Seq[(String, String)])], queryParamRefs: Set[String]) {
+case class GeneratedEndpoints(
+    namesAndBodies: Seq[(Option[String], Seq[(String, String)])],
+    queryParamRefs: Set[String],
+    jsonParamRefs: Set[String]
+) {
   def merge(that: GeneratedEndpoints): GeneratedEndpoints =
     GeneratedEndpoints(
       (namesAndBodies ++ that.namesAndBodies).groupBy(_._1).mapValues(_.map(_._2).reduce(_ ++ _)).toSeq,
-      queryParamRefs ++ that.queryParamRefs
+      queryParamRefs ++ that.queryParamRefs,
+      jsonParamRefs ++ that.jsonParamRefs
     )
 }
-case class EndpointDefs(endpointDecls: Map[Option[String], String], queryParamRefs: Set[String])
+case class EndpointDefs(endpointDecls: Map[Option[String], String], queryParamRefs: Set[String], jsonParamRefs: Set[String])
 
 class EndpointGenerator {
   private def bail(msg: String)(implicit location: Location): Nothing = throw new NotImplementedError(s"$msg at $location")
@@ -37,8 +42,10 @@ class EndpointGenerator {
 
   def endpointDefs(doc: OpenapiDocument, useHeadTagForObjectNames: Boolean): EndpointDefs = {
     val components = Option(doc.components).flatten
-    val GeneratedEndpoints(geMap, queryParamRefs) =
-      doc.paths.map(generatedEndpoints(components, useHeadTagForObjectNames)).foldLeft(GeneratedEndpoints(Nil, Set.empty))(_ merge _)
+    val GeneratedEndpoints(geMap, queryParamRefs, jsonParamRefs) =
+      doc.paths
+        .map(generatedEndpoints(components, useHeadTagForObjectNames))
+        .foldLeft(GeneratedEndpoints(Nil, Set.empty, Set.empty))(_ merge _)
     val endpointDecls = geMap.map { case (k, ge) =>
       val definitions = ge
         .map { case (name, definition) =>
@@ -54,7 +61,7 @@ class EndpointGenerator {
           |$allEP
           |""".stripMargin
     }.toMap
-    EndpointDefs(endpointDecls, queryParamRefs)
+    EndpointDefs(endpointDecls, queryParamRefs, jsonParamRefs)
   }
 
   private[codegen] def generatedEndpoints(components: Option[OpenapiComponent], useHeadTagForObjectNames: Boolean)(
@@ -63,7 +70,7 @@ class EndpointGenerator {
     val parameters = components.map(_.parameters).getOrElse(Map.empty)
     val securitySchemes = components.map(_.securitySchemes).getOrElse(Map.empty)
 
-    val (fileNamesAndParams, unflattenedQueryParamRefs) = p.methods
+    val (fileNamesAndParams, unflattenedParamRefs) = p.methods
       .map(_.withResolvedParentParameters(parameters, p.parameters))
       .map { m =>
         implicit val location: Location = Location(p.url, m.methodType)
@@ -102,14 +109,24 @@ class EndpointGenerator {
           .collect { case queryParam: OpenapiParameter if queryParam.in == "query" => queryParam.schema }
           .collect { case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => ref.stripPrefix("#/components/schemas/") }
           .toSet
-        (maybeTargetFileName, (name, definition)) -> queryParamRefs
+        val jsonParamRefs = m.requestBody.toSeq
+          .flatMap(_.content)
+          .collect { case content if content.contentType == "application/json" => content.schema }
+          .collect { case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => ref.stripPrefix("#/components/schemas/") }
+          .toSet
+        ((maybeTargetFileName, (name, definition)), (queryParamRefs, jsonParamRefs))
       }
       .unzip
+    val (unflattenedQueryParamRefs, unflattenedJsonParamRefs) = unflattenedParamRefs.unzip
     val namesAndParamsByFile = fileNamesAndParams
       .groupBy(_._1)
       .toSeq
       .map { case (maybeTargetFileName, defns) => maybeTargetFileName -> defns.map(_._2) }
-    GeneratedEndpoints(namesAndParamsByFile, unflattenedQueryParamRefs.foldLeft(Set.empty[String])(_ ++ _))
+    GeneratedEndpoints(
+      namesAndParamsByFile,
+      unflattenedQueryParamRefs.foldLeft(Set.empty[String])(_ ++ _),
+      unflattenedJsonParamRefs.foldLeft(Set.empty[String])(_ ++ _)
+    )
   }
 
   private def urlMapper(url: String, parameters: Seq[OpenapiParameter])(implicit location: Location): String = {
