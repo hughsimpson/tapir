@@ -12,6 +12,7 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
   OpenapiSchemaArray,
   OpenapiSchemaBinary,
   OpenapiSchemaRef,
+  OpenapiSchemaAny,
   OpenapiSchemaSimpleType
 }
 import sttp.tapir.codegen.openapi.models.{OpenapiComponent, OpenapiSchemaType, OpenapiSecuritySchemeType}
@@ -112,7 +113,17 @@ class EndpointGenerator {
         val jsonParamRefs = (m.requestBody.toSeq.flatMap(_.content.map(c => (c.contentType, c.schema))) ++
           m.responses.flatMap(_.content.map(c => (c.contentType, c.schema))))
           .collect { case (contentType, schema) if contentType == "application/json" => schema }
-          .collect { case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => ref.stripPrefix("#/components/schemas/") }
+          .collect {
+            case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => ref.stripPrefix("#/components/schemas/")
+            case OpenapiSchemaArray(OpenapiSchemaRef(ref), _) if ref.startsWith("#/components/schemas/") =>
+              val name = ref.stripPrefix("#/components/schemas/")
+              name
+            case OpenapiSchemaArray(OpenapiSchemaAny(_), _) =>
+              bail("Cannot generate schema for 'Any' with jsoniter library")
+            case OpenapiSchemaArray(simple: OpenapiSchemaSimpleType, _) =>
+              val name = BasicGenerator.mapSchemaSimpleTypeToType(simple)._1
+              s"List[$name]"
+          }
           .toSet
         ((maybeTargetFileName, (name, definition)), (queryParamRefs, jsonParamRefs))
       }

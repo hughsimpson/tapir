@@ -283,10 +283,12 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
     val resWithQueryParamCodec = gen.classDefs(doc, true, queryParamRefs = Set("Test"), jsonParamRefs = Set("Test"))
     // can't just check whether these compile, because our tests only run on scala 2.12 - so instead just eyeball it...
     res shouldBe Some("""
+      |
       |enum Test derives org.latestbit.circe.adt.codec.JsonTaggedAdt.PureCodec {
       |  case enum1, enum2
       |}""".stripMargin)
     resWithQueryParamCodec shouldBe Some("""
+      |
       |def enumMap[E: enumextensions.EnumMirror]: Map[String, E] =
       |  Map.from(
       |    for e <- enumextensions.EnumMirror[E].values yield e.name.toUpperCase -> e

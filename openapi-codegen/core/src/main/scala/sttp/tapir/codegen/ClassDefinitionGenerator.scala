@@ -148,6 +148,18 @@ class ClassDefinitionGenerator {
           |        )
           |    )(_.entryName)
           |""".stripMargin
+    val seqSerdes = jsonParamRefs.toSeq
+      .filter(_ startsWith "List[")
+      .map(s =>
+        jsonSerdeLib match {
+          case JsonSerdeLib.Jsoniter =>
+            val name = s.replace("[", "_").replace("]", "_").replace(".", "_") + "JsonCodec"
+            s"""implicit lazy val $name: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[$s] =
+            |  com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make[$s]""".stripMargin
+          case _ => ""
+        }
+      )
+      .mkString("", "\n", "\n")
     val defns = doc.components
       .map(_.schemas.flatMap {
         case (name, obj: OpenapiSchemaObject) =>
@@ -158,7 +170,7 @@ class ClassDefinitionGenerator {
         case (n, x) => throw new NotImplementedError(s"Only objects, enums and maps supported! (for $n found ${x})")
       })
       .map(_.mkString("\n"))
-    defns.map(maybeJsonSerdeHelpers + enumQuerySerdeHelper + _)
+    defns.map(seqSerdes + maybeJsonSerdeHelpers + enumQuerySerdeHelper + _)
   }
 
   private[codegen] def generateMap(
