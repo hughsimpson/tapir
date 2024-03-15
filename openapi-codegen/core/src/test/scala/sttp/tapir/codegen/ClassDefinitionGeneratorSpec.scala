@@ -1,12 +1,13 @@
 package sttp.tapir.codegen
 
-import sttp.tapir.codegen.openapi.models.OpenapiComponent
+import sttp.tapir.codegen.openapi.models.{OpenapiComponent, OpenapiSchemaType}
 import sttp.tapir.codegen.openapi.models.OpenapiModels.OpenapiDocument
 import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
   OpenapiSchemaAny,
   OpenapiSchemaArray,
   OpenapiSchemaConstantString,
   OpenapiSchemaEnum,
+  OpenapiSchemaField,
   OpenapiSchemaMap,
   OpenapiSchemaObject,
   OpenapiSchemaRef,
@@ -15,6 +16,7 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
 import sttp.tapir.codegen.testutils.CompileCheckTestBase
 
 class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
+  def noDefault(f: OpenapiSchemaType): OpenapiSchemaField = OpenapiSchemaField(f, None)
 
   it should "generate the example class defs" in {
     new ClassDefinitionGenerator().classDefs(TestHelpers.myBookshopDoc).get shouldCompile ()
@@ -28,7 +30,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq("text"), false)
+            "Test" -> OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq("text"), false)
           )
         )
       )
@@ -66,7 +68,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("type" -> OpenapiSchemaString(false)), Seq("type"), false)
+            "Test" -> OpenapiSchemaObject(Map("type" -> noDefault(OpenapiSchemaString(false))), Seq("type"), false)
           )
         )
       )
@@ -83,7 +85,11 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("texts" -> OpenapiSchemaArray(OpenapiSchemaString(false), false)), Seq("texts"), false)
+            "Test" -> OpenapiSchemaObject(
+              Map("texts" -> noDefault(OpenapiSchemaArray(OpenapiSchemaString(false), false))),
+              Seq("texts"),
+              false
+            )
           )
         )
       )
@@ -100,7 +106,11 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("texts" -> OpenapiSchemaMap(OpenapiSchemaString(false), false)), Seq("texts"), false)
+            "Test" -> OpenapiSchemaObject(
+              Map("texts" -> noDefault(OpenapiSchemaMap(OpenapiSchemaString(false), false))),
+              Seq("texts"),
+              false
+            )
           )
         )
       )
@@ -117,7 +127,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("anyType" -> OpenapiSchemaAny(false)), Seq("anyType"), false)
+            "Test" -> OpenapiSchemaObject(Map("anyType" -> noDefault(OpenapiSchemaAny(false))), Seq("anyType"), false)
           )
         )
       )
@@ -136,7 +146,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
           Map(
             "Test" -> OpenapiSchemaObject(
               Map(
-                "inner" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq("text"), false)
+                "inner" -> noDefault(OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq("text"), false))
               ),
               Seq("inner"),
               false
@@ -157,16 +167,19 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(
-              Map(
-                "objects" -> OpenapiSchemaArray(
-                  OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq("text"), false),
-                  false
-                )
-              ),
-              Seq("objects"),
-              false
-            )
+            "Test" ->
+              OpenapiSchemaObject(
+                Map(
+                  "objects" -> noDefault(
+                    OpenapiSchemaArray(
+                      OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq("text"), false),
+                      false
+                    )
+                  )
+                ),
+                Seq("objects"),
+                false
+              )
           )
         )
       )
@@ -183,16 +196,19 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(
-              Map(
-                "objects" -> OpenapiSchemaMap(
-                  OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq("text"), false),
-                  false
-                )
-              ),
-              Seq("objects"),
-              false
-            )
+            "Test" ->
+              OpenapiSchemaObject(
+                Map(
+                  "objects" -> noDefault(
+                    OpenapiSchemaMap(
+                      OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq("text"), false),
+                      false
+                    )
+                  )
+                ),
+                Seq("objects"),
+                false
+              )
           )
         )
       )
@@ -209,7 +225,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq.empty, false)
+            "Test" -> OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq.empty, false)
           )
         )
       )
@@ -221,7 +237,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq("text"), false)
+            "Test" -> OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq("text"), false)
           )
         )
       )
@@ -241,7 +257,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(false)), Seq.empty, false)
+            "Test" -> OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(false))), Seq.empty, false)
           )
         )
       )
@@ -253,7 +269,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "Test" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(true)), Seq("text"), false)
+            "Test" -> OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(true))), Seq("text"), false)
           )
         )
       )
@@ -330,7 +346,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Some(
         OpenapiComponent(
           Map(
-            "MyObject" -> OpenapiSchemaObject(Map("text" -> OpenapiSchemaString(true)), Seq("text"), false),
+            "MyObject" -> OpenapiSchemaObject(Map("text" -> noDefault(OpenapiSchemaString(true))), Seq("text"), false),
             "MyEnum" -> OpenapiSchemaEnum("string", Seq(OpenapiSchemaConstantString("enum1"), OpenapiSchemaConstantString("enum2")), false),
             "MyMapPrimitive" -> OpenapiSchemaMap(OpenapiSchemaString(false), false),
             "MyMapObject" -> OpenapiSchemaMap(OpenapiSchemaRef("#/components/schemas/MyObject"), false),
