@@ -8,7 +8,8 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType._
 import scala.annotation.tailrec
 
 class ClassDefinitionGenerator {
-  val jsoniterDefaultConfig = "com.github.plokhotnyuk.jsoniter_scala.macros.CodecMakerConfig.withAllowRecursiveTypes(true).withDiscriminatorFieldName(scala.None)"
+  val jsoniterDefaultConfig =
+    "com.github.plokhotnyuk.jsoniter_scala.macros.CodecMakerConfig.withAllowRecursiveTypes(true).withDiscriminatorFieldName(scala.None)"
 
   def classDefs(
       doc: OpenapiDocument,
