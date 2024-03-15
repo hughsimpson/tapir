@@ -280,7 +280,7 @@ class EndpointGenerator {
           case _: OpenapiSchemaBinary =>
             "multipartBody"
           case schemaRef: OpenapiSchemaRef =>
-            val (t, _) = mapSchemaSimpleTypeToType(schemaRef)
+            val (t, _) = mapSchemaSimpleTypeToType(schemaRef, multipartForm = true)
             s"multipartBody[$t]"
           case x => bail(s"$contentType only supports schema ref or binary. Found $x")
         }

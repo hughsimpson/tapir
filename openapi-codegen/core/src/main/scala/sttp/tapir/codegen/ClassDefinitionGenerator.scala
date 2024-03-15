@@ -262,6 +262,7 @@ class ClassDefinitionGenerator {
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
       jsonParamRefs: Set[String]
   ): Seq[String] = {
+    val isJson = jsonParamRefs contains name
     def rec(name: String, obj: OpenapiSchemaObject, acc: List[String]): Seq[String] = {
       val innerClasses = obj.properties
         .collect {
@@ -281,7 +282,7 @@ class ClassDefinitionGenerator {
         .toList
 
       val properties = obj.properties.map { case (key, schemaType) =>
-        val tpe = mapSchemaTypeToType(name, key, obj.required.contains(key), schemaType)
+        val tpe = mapSchemaTypeToType(name, key, obj.required.contains(key), schemaType, isJson)
         val fixedKey = fixKey(key)
         s"$fixedKey: $tpe"
       }
@@ -295,7 +296,7 @@ class ClassDefinitionGenerator {
           s"""implicit lazy val ${uncapitalisedName}JsonCodec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[${name}] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make"""
       }
       val maybeCompanion =
-        if (jsonParamRefs.contains(name))
+        if (isJson)
           s"""
           |object $name {
           |${indent(2)(jsonCodec)}
@@ -311,20 +312,20 @@ class ClassDefinitionGenerator {
     rec(addName("", name), obj, Nil)
   }
 
-  private def mapSchemaTypeToType(parentName: String, key: String, required: Boolean, schemaType: OpenapiSchemaType): String = {
+  private def mapSchemaTypeToType(parentName: String, key: String, required: Boolean, schemaType: OpenapiSchemaType, isJson: Boolean): String = {
     val (tpe, optional) = schemaType match {
       case simpleType: OpenapiSchemaSimpleType =>
-        mapSchemaSimpleTypeToType(simpleType)
+        mapSchemaSimpleTypeToType(simpleType, multipartForm = !isJson)
 
       case objectType: OpenapiSchemaObject =>
         addName(parentName, key) -> objectType.nullable
 
       case mapType: OpenapiSchemaMap =>
-        val innerType = mapSchemaTypeToType(addName(parentName, key), "item", required = true, mapType.items)
+        val innerType = mapSchemaTypeToType(addName(parentName, key), "item", required = true, mapType.items, isJson = isJson)
         s"Map[String, $innerType]" -> mapType.nullable
 
       case arrayType: OpenapiSchemaArray =>
-        val innerType = mapSchemaTypeToType(addName(parentName, key), "item", required = true, arrayType.items)
+        val innerType = mapSchemaTypeToType(addName(parentName, key), "item", required = true, arrayType.items, isJson = isJson)
         s"Seq[$innerType]" -> arrayType.nullable
 
       case _ =>

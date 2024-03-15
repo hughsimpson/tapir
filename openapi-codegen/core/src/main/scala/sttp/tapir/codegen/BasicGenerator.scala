@@ -100,7 +100,7 @@ object BasicGenerator {
     str.linesIterator.map(" " * i + _).mkString("\n")
   }
 
-  def mapSchemaSimpleTypeToType(osst: OpenapiSchemaSimpleType): (String, Boolean) = {
+  def mapSchemaSimpleTypeToType(osst: OpenapiSchemaSimpleType, multipartForm: Boolean = false): (String, Boolean) = {
     osst match {
       case OpenapiSchemaDouble(nb) =>
         ("Double", nb)
@@ -118,8 +118,10 @@ object BasicGenerator {
         ("String", nb)
       case OpenapiSchemaBoolean(nb) =>
         ("Boolean", nb)
-      case OpenapiSchemaBinary(nb) =>
+      case OpenapiSchemaBinary(nb) if multipartForm =>
         ("sttp.model.Part[java.io.File]", nb)
+      case OpenapiSchemaBinary(nb) =>
+        ("Array[Byte]", nb)
       case OpenapiSchemaAny(nb) =>
         ("io.circe.Json", nb)
       case OpenapiSchemaRef(t) =>
