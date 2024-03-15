@@ -178,4 +178,15 @@ class ModelParserSpec extends AnyFlatSpec with Matchers with Checkers {
       TestHelpers.specificationExtensionDocs
     ))
   }
+
+  it should "parse endpoint with defaults" in {
+    val res = parser
+      .parse(TestHelpers.withDefaultsYaml)
+      .leftMap(err => err: Error)
+      .flatMap(_.as[OpenapiDocument])
+
+    res shouldBe (Right(
+      TestHelpers.withDefaultsDocs
+    ))
+  }
 }

@@ -1,13 +1,6 @@
 package sttp.tapir.codegen
 import sttp.tapir.codegen.BasicGenerator.{indent, mapSchemaSimpleTypeToType}
-import sttp.tapir.codegen.openapi.models.OpenapiModels.{
-  OpenapiDocument,
-  OpenapiParameter,
-  OpenapiPath,
-  OpenapiRequestBody,
-  OpenapiResponse,
-  SpecificationExtensionValue
-}
+import sttp.tapir.codegen.openapi.models.OpenapiModels.{OpenapiDocument, OpenapiParameter, OpenapiPath, OpenapiRequestBody, OpenapiResponse}
 import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
   OpenapiSchemaArray,
   OpenapiSchemaBinary,
@@ -15,7 +8,7 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
   OpenapiSchemaAny,
   OpenapiSchemaSimpleType
 }
-import sttp.tapir.codegen.openapi.models.{OpenapiComponent, OpenapiSchemaType, OpenapiSecuritySchemeType}
+import sttp.tapir.codegen.openapi.models.{OpenapiComponent, OpenapiSchemaType, OpenapiSecuritySchemeType, ReifiableRenderableValue}
 import sttp.tapir.codegen.util.JavaEscape
 
 case class Location(path: String, method: String) {
@@ -216,7 +209,7 @@ class EndpointGenerator {
     openapiTags.map(_.distinct.mkString(".tags(List(\"", "\", \"", "\"))")).mkString
   }
 
-  private def attributes(atts: Map[String, SpecificationExtensionValue]): Option[String] = if (atts.nonEmpty) Some {
+  private def attributes(atts: Map[String, ReifiableRenderableValue]): Option[String] = if (atts.nonEmpty) Some {
     atts.map { case (k, v) => s""".attribute[${v.tpe}](new AttributeKey[${v.tpe}]("${k}"), ${v.render})""" }.mkString("\n")
   }
   else None
