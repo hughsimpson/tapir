@@ -151,7 +151,7 @@ class ClassDefinitionGenerator {
           |    )(_.entryName)
           |""".stripMargin
     val additionalExplicitSerdes = jsonParamRefs.toSeq
-      .filter(x => !allSchemas.contains(x))
+      .filter(x => !allSchemas.contains(x) && !x.contains("java.io.File"))
       .map(s =>
         jsonSerdeLib match {
           case JsonSerdeLib.Jsoniter =>
