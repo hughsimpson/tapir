@@ -53,7 +53,7 @@ class ClassDefinitionGenerator {
     // For jsoniter-scala, we define explicit serdes for any 'primitive' params (e.g. List[java.util.UUID]) that we reference.
     // This should be the set of all json param refs not included in our schema definitions
     val additionalExplicitSerdes = jsonParamRefs.toSeq
-      .filter(x => !allSchemas.contains(x) && !x.contains("java.io.File"))
+      .filter(x => !allSchemas.contains(x))
       .map(s =>
         jsonSerdeLib match {
           case JsonSerdeLib.Jsoniter =>
