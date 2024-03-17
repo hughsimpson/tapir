@@ -2,7 +2,6 @@ package sttp.tapir.codegen
 
 import sttp.tapir.codegen.openapi.models.{OpenapiComponent, OpenapiSchemaType}
 import sttp.tapir.codegen.openapi.models.OpenapiModels.OpenapiDocument
-import sttp.tapir.codegen.openapi.models.OpenapiSchemaType
 import sttp.tapir.codegen.openapi.models.OpenapiSchemaType._
 import sttp.tapir.codegen.testutils.CompileCheckTestBase
 
@@ -290,17 +289,14 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
     val resWithQueryParamCodec = gen.classDefs(doc, true, queryParamRefs = Set("Test"), jsonParamRefs = Set("Test"))
     // can't just check whether these compile, because our tests only run on scala 2.12 - so instead just eyeball it...
     res shouldBe Some("""
-      |
       |enum Test derives org.latestbit.circe.adt.codec.JsonTaggedAdt.PureCodec {
       |  case enum1, enum2
-      |}""".stripMargin)
-    resWithQueryParamCodec shouldBe Some("""
-      |
-      |def enumMap[E: enumextensions.EnumMirror]: Map[String, E] =
+      |}
+      |""".stripMargin)
+    resWithQueryParamCodec shouldBe Some("""def enumMap[E: enumextensions.EnumMirror]: Map[String, E] =
       |  Map.from(
       |    for e <- enumextensions.EnumMirror[E].values yield e.name.toUpperCase -> e
       |  )
-      |
       |def makeQueryCodecForEnum[T: enumextensions.EnumMirror]: sttp.tapir.Codec[List[String], T, sttp.tapir.CodecFormat.TextPlain] =
       |  sttp.tapir.Codec
       |    .listHead[String, String, sttp.tapir.CodecFormat.TextPlain]
@@ -319,14 +315,14 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       |          sttp.tapir.DecodeResult.Value(_)
       |        )
       |    )(_.name)
-      |
       |object Test {
       |  given stringListTestCodec: sttp.tapir.Codec[List[String], Test, sttp.tapir.CodecFormat.TextPlain] =
       |    makeQueryCodecForEnum[Test]
       |}
       |enum Test derives org.latestbit.circe.adt.codec.JsonTaggedAdt.PureCodec, enumextensions.EnumMirror {
       |  case enum1, enum2
-      |}""".stripMargin)
+      |}
+      |""".stripMargin)
   }
 
   it should "generate named maps" in {
@@ -453,5 +449,14 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       Seq(allSchemas("TopMap"), allSchemas("TopArray"), allSchemas("TopObject"))
     ) shouldEqual allSchemas.keySet
 
+  }
+
+  it should "generate ADTs for oneOf schemas" in {
+    val gen = new ClassDefinitionGenerator()
+    val res = gen.classDefs(TestHelpers.oneOfDocs, false, jsonSerdeLib = JsonSerdeLib.Jsoniter, jsonParamRefs = Set("ReqWithVariants")).get
+    res should include(
+      """lazy implicit val reqWithVariantsCodec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[ReqWithVariants] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make(com.github.plokhotnyuk.jsoniter_scala.macros.CodecMakerConfig.withAllowRecursiveTypes(true).withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(Some("type")))"""
+    )
+    res shouldCompile ()
   }
 }

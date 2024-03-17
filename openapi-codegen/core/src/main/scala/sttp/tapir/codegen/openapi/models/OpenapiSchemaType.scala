@@ -87,6 +87,8 @@ object OpenapiSchemaType {
       name: String
   ) extends OpenapiSchemaSimpleType {
     val nullable = false
+    def isSchema: Boolean = name.startsWith("#/components/schemas/")
+    def stripped: String = name.stripPrefix("#/components/schemas/")
   }
 
   case class OpenapiSchemaAny(
@@ -296,8 +298,8 @@ object OpenapiSchemaType {
     for {
       schemaType <- c.as[OpenapiSchemaType]
       maybeName = schemaType match {
-        case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") => Some(ref.stripPrefix("#/components/schemas/"))
-        case _                                                                => None
+        case ref: OpenapiSchemaRef if ref.isSchema => Some(ref.stripped)
+        case _                                     => None
       }
       maybeDefault = decodeRenderable(maybeName, c.downField("default"))
     } yield (schemaType, maybeDefault)

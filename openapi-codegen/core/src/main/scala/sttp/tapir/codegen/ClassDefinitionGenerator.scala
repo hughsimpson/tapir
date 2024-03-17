@@ -15,8 +15,8 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType._
 import scala.annotation.tailrec
 
 class ClassDefinitionGenerator {
-  val jsoniterDefaultConfig =
-    "com.github.plokhotnyuk.jsoniter_scala.macros.CodecMakerConfig.withAllowRecursiveTypes(true).withDiscriminatorFieldName(scala.None)"
+  val jsoniterBaseConfig = "com.github.plokhotnyuk.jsoniter_scala.macros.CodecMakerConfig.withAllowRecursiveTypes(true)"
+  val jsoniterDefaultConfig = s"$jsoniterBaseConfig.withDiscriminatorFieldName(scala.None)"
 
   def classDefs(
       doc: OpenapiDocument,
@@ -26,6 +26,32 @@ class ClassDefinitionGenerator {
       jsonParamRefs: Set[String] = Set.empty
   ): Option[String] = {
     val allSchemas: Map[String, OpenapiSchemaType] = doc.components.toSeq.flatMap(_.schemas).toMap
+    val allOneOfSchemas = allSchemas.collect { case (name, oneOf: OpenapiSchemaOneOf) => name -> oneOf }.toSeq
+    val adtInheritanceMap: Map[String, Seq[String]] = allOneOfSchemas
+      .flatMap { case (name, schema) =>
+        val children = schema.types.map {
+          case ref: OpenapiSchemaRef if ref.isSchema => Right(ref.stripped)
+          case other                                 => Left(other.getClass.getName)
+        }
+        children.collect { case Left(unsupportedChild) =>
+          throw new NotImplementedError(
+            s"oneOf declarations are only supported when all variants are declared schemas. Found type '$unsupportedChild' as variant of $name"
+          )
+        }
+        val validatedChildren = children.collect { case Right(kv) => kv }
+        schema.discriminator match {
+          case None =>
+          case Some(d) =>
+            val targetClassNames = d.mapping.values.map(_.split('/').last).toSet
+            if (targetClassNames != validatedChildren.toSet)
+              throw new IllegalArgumentException(
+                s"Discriminator values $targetClassNames did not match schema variants $validatedChildren for oneOf defn $name"
+              )
+        }
+        validatedChildren.map(_ -> name)
+      }
+      .groupBy(_._1)
+      .mapValues(_.map(_._2))
     val generatesQueryParamEnums =
       allSchemas
         .collect { case (name, _: OpenapiSchemaEnum) => name }
@@ -49,6 +75,8 @@ class ClassDefinitionGenerator {
         |  com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make[Option[T]]($jsoniterDefaultConfig)
         |""".stripMargin
       else ""
+
+    val adtTypes = adtInheritanceMap.flatMap(_._2).toSeq.distinct.map(name => s"sealed trait $name").mkString("", "\n", "\n")
     val enumQuerySerdeHelper = if (!generatesQueryParamEnums) "" else enumQuerySerdeHelperDefn(targetScala3)
     // For jsoniter-scala, we define explicit serdes for any 'primitive' params (e.g. List[java.util.UUID]) that we reference.
     // This should be the set of all json param refs not included in our schema definitions
@@ -64,17 +92,88 @@ class ClassDefinitionGenerator {
         }
       )
       .mkString("", "\n", "\n")
+    val postDefns = doc.components
+      .map(
+        _.schemas
+          .collect { case (name, schema: OpenapiSchemaOneOf) =>
+            generateAdtSerde(name, schema, jsonSerdeLib, allTransitiveJsonParamRefs)
+          }
+          .flatten
+      )
+      .map(_.mkString("\n", "\n", ""))
     val defns = doc.components
       .map(_.schemas.flatMap {
         case (name, obj: OpenapiSchemaObject) =>
-          generateClass(name, obj, jsonSerdeLib, allTransitiveJsonParamRefs)
+          generateClass(name, obj, jsonSerdeLib, allTransitiveJsonParamRefs, adtInheritanceMap)
         case (name, obj: OpenapiSchemaEnum) =>
           generateEnum(name, obj, targetScala3, queryParamRefs, jsonSerdeLib, allTransitiveJsonParamRefs)
         case (name, OpenapiSchemaMap(valueSchema, _)) => generateMap(name, valueSchema, jsonSerdeLib, allTransitiveJsonParamRefs)
+        case (_, _: OpenapiSchemaOneOf)               => Nil
         case (n, x) => throw new NotImplementedError(s"Only objects, enums and maps supported! (for $n found ${x})")
       })
       .map(_.mkString("\n"))
-    defns.map(additionalExplicitSerdes + maybeJsonSerdeHelpers + enumQuerySerdeHelper + _)
+    val helpers = (additionalExplicitSerdes + maybeJsonSerdeHelpers + enumQuerySerdeHelper + adtTypes).linesIterator
+      .filterNot(_.forall(_.isWhitespace))
+      .mkString("\n")
+    defns.map(helpers + _).map(_ + postDefns.getOrElse(""))
+  }
+
+  private def generateAdtSerde(
+      name: String,
+      schema: OpenapiSchemaOneOf,
+      jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
+      allTransitiveJsonParamRefs: Set[String]
+  ): Seq[String] = if (!allTransitiveJsonParamRefs.contains(name)) Nil
+  else {
+    val uncapitalisedName = name.head.toLower +: name.tail
+    jsonSerdeLib match {
+      case JsonSerdeLib.Jsoniter =>
+        schema match {
+          case OpenapiSchemaOneOf(_, Some(discriminator)) =>
+            val discriminatorMapName = s"${uncapitalisedName}DiscriminatorMap"
+            val schemaToJsonMapping = discriminator.mapping
+              .map { case (jsonValue, fullRef) =>
+                fullRef.stripPrefix("#/components/schemas/") -> jsonValue
+              }
+            val body = if (schemaToJsonMapping.exists { case (className, jsonValue) => className != jsonValue }) {
+              val discriminatorMap = schemaToJsonMapping
+                .map { case (k, v) => s""""$k" -> "$v"""" }
+                .mkString(s"val $discriminatorMapName: Map[String, String] = Map(\n", ",", "\n)")
+              val config =
+                s"""$jsoniterBaseConfig.withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(Some("${discriminator.propertyName}")).withAdtLeafClassNameMapper(s => $discriminatorMapName(s.split('.').last))"""
+              val serde =
+                s"lazy implicit val ${uncapitalisedName}Codec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[$name] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make($config)"
+
+              s"""$discriminatorMap
+                 |$serde
+                 |""".stripMargin
+            } else {
+              val config =
+                s"""$jsoniterBaseConfig.withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(Some("${discriminator.propertyName}"))"""
+              s"lazy implicit val ${uncapitalisedName}Codec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[$name] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make($config)"
+            }
+            Seq(body)
+
+          case OpenapiSchemaOneOf(_, None) =>
+            val config = s"""$jsoniterBaseConfig.withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(None)"""
+            val serde =
+              s"lazy implicit val ${uncapitalisedName}Codec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[$name] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make($config)"
+            Seq(serde)
+        }
+      case JsonSerdeLib.Circe =>
+        schema match {
+          case OpenapiSchemaOneOf(_, Some(_)) =>
+            throw new NotImplementedError(s"Discriminators are not implemented for circe json lib (seen for ADT $name)")
+
+          case OpenapiSchemaOneOf(_, None) =>
+            val companion =
+              s"""object $name {
+                 |  implicit lazy val ${uncapitalisedName}JsonDecoder: io.circe.Decoder[$name] = io.circe.generic.semiauto.deriveDecoder[$name]
+                 |  implicit lazy val ${uncapitalisedName}JsonEncoder: io.circe.Encoder[$name] = io.circe.generic.semiauto.deriveEncoder[$name]
+                 |}""".stripMargin
+            Seq(companion)
+        }
+    }
   }
 
   private def enumQuerySerdeHelperDefn(targetScala3: Boolean): String = if (targetScala3)
@@ -131,8 +230,8 @@ class ClassDefinitionGenerator {
       case next +: rest => Some((next, checked, rest ++ tail))
     }
     val maybeNextParams = toCheck match {
-      case OpenapiSchemaRef(ref) if ref.startsWith("#/components/schemas/") =>
-        val name = ref.stripPrefix("#/components/schemas/")
+      case ref: OpenapiSchemaRef if ref.isSchema =>
+        val name = ref.stripped
         val maybeAppended = if (checked contains name) None else allSchemas.get(name)
         (tail ++ maybeAppended) match {
           case Nil          => None
@@ -236,7 +335,8 @@ class ClassDefinitionGenerator {
        |  implicit val ${uncapitalisedName}QueryCodec: sttp.tapir.Codec[List[String], ${name}, sttp.tapir.CodecFormat.TextPlain] =
        |    makeQueryCodecForEnum("${name}", ${name})""".stripMargin
       else ""
-    s"""|sealed trait $name extends enumeratum.EnumEntry
+    s"""
+        |sealed trait $name extends enumeratum.EnumEntry
         |object $name extends enumeratum.Enum[$name]$maybeCodecExtension {
         |  val values = findValues$maybeJsonCodecDefn
         |${indent(2)(members.mkString("\n"))}$maybeQueryCodecDefn
@@ -247,7 +347,8 @@ class ClassDefinitionGenerator {
       name: String,
       obj: OpenapiSchemaObject,
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
-      jsonParamRefs: Set[String]
+      jsonParamRefs: Set[String],
+      adtInheritanceMap: Map[String, Seq[String]]
   ): Seq[String] = {
     val isJson = jsonParamRefs contains name
     def rec(name: String, obj: OpenapiSchemaObject, acc: List[String]): Seq[String] = {
@@ -291,10 +392,14 @@ class ClassDefinitionGenerator {
           |}"""
         else ""
 
+      val parents = adtInheritanceMap.getOrElse(name, Nil) match {
+        case Nil => ""
+        case ps  => ps.mkString(" extends ", " with ", "")
+      }
       s"""|$maybeCompanion
           |case class $name (
           |${indent(2)(properties.mkString(",\n"))}
-          |)""".stripMargin :: innerClasses ::: acc
+          |)$parents""".stripMargin :: innerClasses ::: acc
     }
 
     rec(addName("", name), obj, Nil)
@@ -343,15 +448,15 @@ class ClassDefinitionGenerator {
       case (ReifiableValueString(_), OpenapiSchemaUUID(_))     => s"java.util.UUID.fromString(${rendered})"
       // Nasty hacks so that enum defaults sometimes work
       case (ReifiableValueString(_), OpenapiSchemaEnum(t, _, _)) => s"$t.$rendered".replace("\"", "")
-      case (ReifiableValueString(_), OpenapiSchemaRef(ref)) =>
-        val t = ref.stripPrefix("#/components/schemas/")
+      case (ReifiableValueString(_), ref: OpenapiSchemaRef) =>
+        val t = ref.stripped
         s"$t.$rendered".replace("\"", "")
       case (ReifiableValueList(l), OpenapiSchemaArray(OpenapiSchemaEnum(t, _, _), _))
           if l.headOption.exists(_.isInstanceOf[ReifiableValueString]) =>
         rendered.replaceAll(""""([^"]+)"""", s"$t.$$1")
-      case (ReifiableValueList(l), OpenapiSchemaArray(OpenapiSchemaRef(ref), _))
+      case (ReifiableValueList(l), OpenapiSchemaArray(ref: OpenapiSchemaRef, _))
           if l.headOption.exists(_.isInstanceOf[ReifiableValueString]) =>
-        val t = ref.stripPrefix("#/components/schemas/")
+        val t = ref.stripped
         rendered.replaceAll(""""([^"]+)"""", s"$t.$$1")
       case _ => rendered
     }
