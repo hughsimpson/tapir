@@ -3,6 +3,7 @@ package sttp.tapir.codegen
 import sttp.tapir.codegen.openapi.models._
 import sttp.tapir.codegen.openapi.models.OpenapiModels._
 import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
+  Discriminator,
   OpenapiSchemaArray,
   OpenapiSchemaConstantString,
   OpenapiSchemaEnum,
@@ -10,6 +11,7 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
   OpenapiSchemaFloat,
   OpenapiSchemaInt,
   OpenapiSchemaObject,
+  OpenapiSchemaOneOf,
   OpenapiSchemaRef,
   OpenapiSchemaString,
   OpenapiSchemaUUID
@@ -788,6 +790,167 @@ object TestHelpers {
             List(OpenapiSchemaConstantString("v1"), OpenapiSchemaConstantString("v2"), OpenapiSchemaConstantString("v3")),
             false
           )
+        ),
+        Map(),
+        Map()
+      )
+    )
+  )
+
+  val oneOfYaml =
+    """
+    |openapi: 3.1.0
+    |info:
+    |  title: oneOf test
+    |  version: '1.0'
+    |paths:
+    |  /hello:
+    |    post:
+    |      requestBody:
+    |        description: Foo
+    |        required: true
+    |        content:
+    |          application/json:
+    |            schema:
+    |              $ref: '#/components/schemas/ReqWithVariants'
+    |      responses:
+    |        '200':
+    |          description: Bar
+    |          content:
+    |            application/json:
+    |              schema:
+    |                type: string
+    |components:
+    |  schemas:
+    |    ReqWithVariants:
+    |      title: ReqWithVariants
+    |      required:
+    |        - type
+    |      type: object
+    |      properties:
+    |        type:
+    |          $ref: '#/components/schemas/ReqSubtype'
+    |      discriminator:
+    |        propertyName: type
+    |        mapping:
+    |          ReqSubtype1: '#/components/schemas/ReqSubtype1'
+    |          ReqSubtype2: '#/components/schemas/ReqSubtype2'
+    |          ReqSubtype3: '#/components/schemas/ReqSubtype3'
+    |          ReqSubtype4: '#/components/schemas/ReqSubtype4'
+    |      oneOf:
+    |        - $ref: '#/components/schemas/ReqSubtype1'
+    |        - $ref: '#/components/schemas/ReqSubtype2'
+    |        - $ref: '#/components/schemas/ReqSubtype3'
+    |        - $ref: '#/components/schemas/ReqSubtype4'
+    |    ReqSubtype:
+    |      title: ReqSubtype
+    |      type: string
+    |      enum:
+    |        - ReqSubtype1
+    |        - ReqSubtype2
+    |        - ReqSubtype3
+    |        - ReqSubtype4
+    |    ReqSubtype1:
+    |      required:
+    |      - foo
+    |      type: object
+    |      properties:
+    |        foo:
+    |          type: string
+    |    ReqSubtype2:
+    |      required:
+    |      - foo
+    |      type: object
+    |      properties:
+    |        foo:
+    |          type: string
+    |    ReqSubtype3:
+    |      required:
+    |      - foo
+    |      type: object
+    |      properties:
+    |        foo:
+    |          type: integer
+    |    ReqSubtype4:
+    |      required:
+    |      - bar
+    |      type: object
+    |      properties:
+    |        bar:
+    |          type: string
+    |""".stripMargin
+
+  val oneOfDocs = OpenapiDocument(
+    "3.1.0",
+    OpenapiInfo("oneOf test", "1.0"),
+    List(
+      OpenapiPath(
+        "/hello",
+        List(
+          OpenapiPathMethod(
+            "post",
+            List(),
+            List(
+              OpenapiResponse(
+                "200",
+                "Bar",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaString(false)))
+              )
+            ),
+            Some(
+              OpenapiRequestBody(
+                true,
+                Some("Foo"),
+                List(OpenapiRequestBodyContent("application/json", OpenapiSchemaRef("#/components/schemas/ReqWithVariants")))
+              )
+            ),
+            List(),
+            None,
+            None,
+            None,
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      )
+    ),
+    Some(
+      OpenapiComponent(
+        Map(
+          "ReqWithVariants" -> OpenapiSchemaOneOf(
+            List(
+              OpenapiSchemaRef("#/components/schemas/ReqSubtype1"),
+              OpenapiSchemaRef("#/components/schemas/ReqSubtype2"),
+              OpenapiSchemaRef("#/components/schemas/ReqSubtype3"),
+              OpenapiSchemaRef("#/components/schemas/ReqSubtype4")
+            ),
+            Some(
+              Discriminator(
+                "type",
+                Map(
+                  "ReqSubtype1" -> "#/components/schemas/ReqSubtype1",
+                  "ReqSubtype2" -> "#/components/schemas/ReqSubtype2",
+                  "ReqSubtype3" -> "#/components/schemas/ReqSubtype3",
+                  "ReqSubtype4" -> "#/components/schemas/ReqSubtype4"
+                )
+              )
+            )
+          ),
+          "ReqSubtype" -> OpenapiSchemaEnum(
+            "string",
+            List(
+              OpenapiSchemaConstantString("ReqSubtype1"),
+              OpenapiSchemaConstantString("ReqSubtype2"),
+              OpenapiSchemaConstantString("ReqSubtype3"),
+              OpenapiSchemaConstantString("ReqSubtype4")
+            ),
+            false
+          ),
+          "ReqSubtype1" -> OpenapiSchemaObject(Map("foo" -> OpenapiSchemaField(OpenapiSchemaString(false), None)), List("foo"), false),
+          "ReqSubtype2" -> OpenapiSchemaObject(Map("foo" -> OpenapiSchemaField(OpenapiSchemaString(false), None)), List("foo"), false),
+          "ReqSubtype3" -> OpenapiSchemaObject(Map("foo" -> OpenapiSchemaField(OpenapiSchemaInt(false), None)), List("foo"), false),
+          "ReqSubtype4" -> OpenapiSchemaObject(Map("bar" -> OpenapiSchemaField(OpenapiSchemaString(false), None)), List("bar"), false)
         ),
         Map(),
         Map()

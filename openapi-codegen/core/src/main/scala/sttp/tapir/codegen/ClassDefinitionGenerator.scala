@@ -141,7 +141,7 @@ class ClassDefinitionGenerator {
       case OpenapiSchemaArray(items, _)                                => Some((items, checked, tail))
       case OpenapiSchemaNot(items)                                     => Some((items, checked, tail))
       case OpenapiSchemaMap(items, _)                                  => Some((items, checked, tail))
-      case OpenapiSchemaOneOf(types)                                   => nextParamsFromTypeSeq(types)
+      case OpenapiSchemaOneOf(types, _)                                => nextParamsFromTypeSeq(types)
       case OpenapiSchemaAnyOf(types)                                   => nextParamsFromTypeSeq(types)
       case OpenapiSchemaAllOf(types)                                   => nextParamsFromTypeSeq(types)
       case OpenapiSchemaObject(properties, _, _) if properties.isEmpty => None

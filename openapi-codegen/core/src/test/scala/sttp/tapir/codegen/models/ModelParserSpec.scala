@@ -6,6 +6,7 @@ import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
   OpenapiSchemaArray,
   OpenapiSchemaConstantString,
   OpenapiSchemaEnum,
+  OpenapiSchemaObject,
   OpenapiSchemaRef,
   OpenapiSchemaString,
   OpenapiSchemaUUID
@@ -188,5 +189,16 @@ class ModelParserSpec extends AnyFlatSpec with Matchers with Checkers {
     res shouldBe (Right(
       TestHelpers.withDefaultsDocs
     ))
+  }
+
+  it should "parse oneOf schemas" in {
+    val res = parser
+      .parse(TestHelpers.oneOfYaml)
+      .leftMap(err => err: Error)
+      .flatMap(_.as[OpenapiDocument])
+
+    res shouldBe Right(
+      TestHelpers.oneOfDocs
+    )
   }
 }
