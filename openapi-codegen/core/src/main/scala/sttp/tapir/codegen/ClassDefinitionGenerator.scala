@@ -380,13 +380,18 @@ class ClassDefinitionGenerator {
         s"$fixedKey: $tpe$default"
       }
 
+      val parents = adtInheritanceMap.getOrElse(name, Nil) match {
+        case Nil => ""
+        case ps  => ps.mkString(" extends ", " with ", "")
+      }
       val uncapitalisedName = name.head.toLower +: name.tail
       def jsonCodec = jsonSerdeLib match {
         case JsonSerdeLib.Circe =>
           s"""implicit lazy val ${uncapitalisedName}JsonDecoder: io.circe.Decoder[$name] = io.circe.generic.semiauto.deriveDecoder[$name]
              |implicit lazy val ${uncapitalisedName}JsonEncoder: io.circe.Encoder[$name] = io.circe.generic.semiauto.deriveEncoder[$name]""".stripMargin
-        case JsonSerdeLib.Jsoniter =>
+        case JsonSerdeLib.Jsoniter if parents.isEmpty =>
           s"""implicit lazy val ${uncapitalisedName}JsonCodec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[${name}] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make($jsoniterDefaultConfig)"""
+        case JsonSerdeLib.Jsoniter => ""
       }
       val maybeCompanion =
         if (isJson)
@@ -396,10 +401,6 @@ class ClassDefinitionGenerator {
           |}"""
         else ""
 
-      val parents = adtInheritanceMap.getOrElse(name, Nil) match {
-        case Nil => ""
-        case ps  => ps.mkString(" extends ", " with ", "")
-      }
       s"""|$maybeCompanion
           |case class $name (
           |${indent(2)(properties.mkString(",\n"))}
