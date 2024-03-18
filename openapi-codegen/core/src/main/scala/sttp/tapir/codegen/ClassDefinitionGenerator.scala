@@ -23,8 +23,9 @@ class ClassDefinitionGenerator {
       targetScala3: Boolean = false,
       queryParamRefs: Set[String] = Set.empty,
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib = JsonSerdeLib.Circe,
-      jsonParamRefs: Set[String] = Set.empty
-  ): Option[String] = {
+      jsonParamRefs: Set[String] = Set.empty,
+      fullModelPath: String = ""
+  ): Option[(String, Option[String])] = {
     val allSchemas: Map[String, OpenapiSchemaType] = doc.components.toSeq.flatMap(_.schemas).toMap
     val allOneOfSchemas = allSchemas.collect { case (name, oneOf: OpenapiSchemaOneOf) => name -> oneOf }.toSeq
     val adtInheritanceMap: Map[String, Seq[String]] = allOneOfSchemas
@@ -92,15 +93,17 @@ class ClassDefinitionGenerator {
         }
       )
       .mkString("", "\n", "\n")
-    val postDefns = doc.components
-      .map(
+    val postDefns = doc.components.toSeq
+      .flatMap(
         _.schemas
           .collect { case (name, schema: OpenapiSchemaOneOf) =>
-            generateAdtSerde(name, schema, jsonSerdeLib, allTransitiveJsonParamRefs)
+            generateAdtSerde(name, schema, jsonSerdeLib, allTransitiveJsonParamRefs, fullModelPath)
           }
           .flatten
-      )
-      .map(_.mkString("\n", "\n", ""))
+      ) match {
+      case Nil => None
+      case seq => Some(seq.mkString("\n", "\n", ""))
+    }
     val defns = doc.components
       .map(_.schemas.flatMap {
         case (name, obj: OpenapiSchemaObject) =>
@@ -115,14 +118,15 @@ class ClassDefinitionGenerator {
     val helpers = (additionalExplicitSerdes + maybeJsonSerdeHelpers + enumQuerySerdeHelper + adtTypes).linesIterator
       .filterNot(_.forall(_.isWhitespace))
       .mkString("\n")
-    defns.map(helpers + _).map(_ + postDefns.getOrElse(""))
+    defns.map(helpers + _).map(_ -> postDefns)
   }
 
   private def generateAdtSerde(
       name: String,
       schema: OpenapiSchemaOneOf,
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
-      allTransitiveJsonParamRefs: Set[String]
+      allTransitiveJsonParamRefs: Set[String],
+      fullModelPath: String
   ): Seq[String] = if (!allTransitiveJsonParamRefs.contains(name)) Nil
   else {
     val uncapitalisedName = name.head.toLower +: name.tail
@@ -130,22 +134,22 @@ class ClassDefinitionGenerator {
       case JsonSerdeLib.Jsoniter =>
         schema match {
           case OpenapiSchemaOneOf(_, Some(discriminator)) =>
-            val discriminatorMapName = s"${uncapitalisedName}DiscriminatorMap"
             val schemaToJsonMapping = discriminator.mapping
               .map { case (jsonValue, fullRef) =>
                 fullRef.stripPrefix("#/components/schemas/") -> jsonValue
               }
             val body = if (schemaToJsonMapping.exists { case (className, jsonValue) => className != jsonValue }) {
-              val discriminatorMap = schemaToJsonMapping
-                .map { case (k, v) => s""""$k" -> "$v"""" }
-                .mkString(s"val $discriminatorMapName: Map[String, String] = Map(\n", ",", "\n)")
+              val discriminatorMap = indent(2)(
+                schemaToJsonMapping
+                  .map { case (k, v) => s"""case "$fullModelPath.$k" => "$v"""" }
+                  .mkString("\n", "\n", "\n")
+              )
               val config =
-                s"""$jsoniterBaseConfig.withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(Some("${discriminator.propertyName}")).withAdtLeafClassNameMapper(s => $discriminatorMapName(s.split('.').last))"""
+                s"""$jsoniterBaseConfig.withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(Some("${discriminator.propertyName}")).withAdtLeafClassNameMapper{$discriminatorMap}"""
               val serde =
                 s"lazy implicit val ${uncapitalisedName}Codec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[$name] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make($config)"
 
-              s"""$discriminatorMap
-                 |$serde
+              s"""$serde
                  |""".stripMargin
             } else {
               val config =

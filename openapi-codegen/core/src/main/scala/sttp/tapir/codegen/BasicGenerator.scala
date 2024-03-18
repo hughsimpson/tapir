@@ -45,12 +45,22 @@ object BasicGenerator {
     }
 
     val EndpointDefs(endpointsByTag, queryParamRefs, jsonParamRefs) = endpointGenerator.endpointDefs(doc, useHeadTagForObjectNames)
+    val (classDefns, extras) =
+      classGenerator
+        .classDefs(doc, targetScala3, queryParamRefs, normalisedJsonLib, jsonParamRefs, s"$packagePath.$objName")
+        .getOrElse("" -> None)
+    val isSplit = extras.nonEmpty
+    val internalImports =
+      if (isSplit)
+        s"""import $packagePath.$objName._
+         |import ${objName}Extras._""".stripMargin
+      else s"import $objName._"
     val taggedObjs = endpointsByTag.collect {
       case (Some(headTag), body) if body.nonEmpty =>
         val taggedObj =
           s"""package $packagePath
            |
-           |import $objName._
+           |$internalImports
            |
            |object $headTag {
            |
@@ -61,6 +71,14 @@ object BasicGenerator {
            |}""".stripMargin
         headTag -> taggedObj
     }
+    val extraObj = extras.map { body =>
+      s"""package $packagePath
+         |
+         |object ${objName}Extras {
+         |  import $packagePath.$objName._
+         |${indent(2)(body)}
+         |}""".stripMargin
+    }
     val mainObj = s"""|
         |package $packagePath
         |
@@ -68,13 +86,13 @@ object BasicGenerator {
         |
         |${indent(2)(imports(normalisedJsonLib))}
         |
-        |${indent(2)(classGenerator.classDefs(doc, targetScala3, queryParamRefs, normalisedJsonLib, jsonParamRefs).getOrElse(""))}
+        |${indent(2)(classDefns)}
         |
         |${indent(2)(endpointsByTag.getOrElse(None, ""))}
         |
         |}
         |""".stripMargin
-    taggedObjs + (objName -> mainObj)
+    taggedObjs ++ extraObj.map(s"${objName}Extras" -> _) + (objName -> mainObj)
   }
 
   private[codegen] def imports(jsonSerdeLib: JsonSerdeLib.JsonSerdeLib): String = {

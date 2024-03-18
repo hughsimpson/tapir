@@ -9,7 +9,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
   def noDefault(f: OpenapiSchemaType): OpenapiSchemaField = OpenapiSchemaField(f, None)
 
   it should "generate the example class defs" in {
-    new ClassDefinitionGenerator().classDefs(TestHelpers.myBookshopDoc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(TestHelpers.myBookshopDoc).get._1 shouldCompile ()
   }
 
   it should "generate simple class" in {
@@ -26,7 +26,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate simple enum" in {
@@ -47,7 +47,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
     // the enumeratum import should be included by the BasicGenerator iff we generated enums
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate simple class with reserved propName" in {
@@ -64,7 +64,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate class with array" in {
@@ -85,7 +85,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate class with map" in {
@@ -106,7 +106,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate class with any type" in {
@@ -123,7 +123,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate class with inner class" in {
@@ -146,7 +146,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate class with array with inner class" in {
@@ -175,7 +175,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "generate class with map with inner class" in {
@@ -204,7 +204,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
 
-    new ClassDefinitionGenerator().classDefs(doc).get shouldCompile ()
+    new ClassDefinitionGenerator().classDefs(doc).get._1 shouldCompile ()
   }
 
   it should "nonrequired and required are not the same" in {
@@ -233,8 +233,8 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
     val gen = new ClassDefinitionGenerator()
-    val res1 = gen.classDefs(doc1)
-    val res2 = gen.classDefs(doc2)
+    val res1 = gen.classDefs(doc1).map(_._1)
+    val res2 = gen.classDefs(doc2).map(_._1)
     res1 shouldNot be(res2)
     res1.get shouldCompile ()
     res2.get shouldCompile ()
@@ -265,8 +265,8 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       )
     )
     val gen = new ClassDefinitionGenerator()
-    val res1 = gen.classDefs(doc1)
-    val res2 = gen.classDefs(doc2)
+    val res1 = gen.classDefs(doc1).map(_._1)
+    val res2 = gen.classDefs(doc2).map(_._1)
     res1 shouldBe res2
   }
 
@@ -285,14 +285,13 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
     )
 
     val gen = new ClassDefinitionGenerator()
-    val res = gen.classDefs(doc, true, jsonParamRefs = Set("Test"))
-    val resWithQueryParamCodec = gen.classDefs(doc, true, queryParamRefs = Set("Test"), jsonParamRefs = Set("Test"))
+    val res = gen.classDefs(doc, true, jsonParamRefs = Set("Test")).map(_._1)
+    val resWithQueryParamCodec = gen.classDefs(doc, true, queryParamRefs = Set("Test"), jsonParamRefs = Set("Test")).map(_._1)
     // can't just check whether these compile, because our tests only run on scala 2.12 - so instead just eyeball it...
     res shouldBe Some("""
       |enum Test derives org.latestbit.circe.adt.codec.JsonTaggedAdt.PureCodec {
       |  case enum1, enum2
-      |}
-      |""".stripMargin)
+      |}""".stripMargin)
     resWithQueryParamCodec shouldBe Some("""def enumMap[E: enumextensions.EnumMirror]: Map[String, E] =
       |  Map.from(
       |    for e <- enumextensions.EnumMirror[E].values yield e.name.toUpperCase -> e
@@ -321,8 +320,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
       |}
       |enum Test derives org.latestbit.circe.adt.codec.JsonTaggedAdt.PureCodec, enumextensions.EnumMirror {
       |  case enum1, enum2
-      |}
-      |""".stripMargin)
+      |}""".stripMargin)
   }
 
   it should "generate named maps" in {
@@ -344,7 +342,7 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
     )
 
     val gen = new ClassDefinitionGenerator()
-    gen.classDefs(doc, false).get shouldCompile ()
+    gen.classDefs(doc, false).get._1 shouldCompile ()
   }
 
   import cats.implicits._
@@ -453,10 +451,12 @@ class ClassDefinitionGeneratorSpec extends CompileCheckTestBase {
 
   it should "generate ADTs for oneOf schemas" in {
     val gen = new ClassDefinitionGenerator()
-    val res = gen.classDefs(TestHelpers.oneOfDocs, false, jsonSerdeLib = JsonSerdeLib.Jsoniter, jsonParamRefs = Set("ReqWithVariants")).get
-    res should include(
+    val (res, extra) =
+      gen.classDefs(TestHelpers.oneOfDocs, false, jsonSerdeLib = JsonSerdeLib.Jsoniter, jsonParamRefs = Set("ReqWithVariants")).get
+    extra.get should include(
       """lazy implicit val reqWithVariantsCodec: com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec[ReqWithVariants] = com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker.make(com.github.plokhotnyuk.jsoniter_scala.macros.CodecMakerConfig.withAllowRecursiveTypes(true).withRequireDiscriminatorFirst(false).withDiscriminatorFieldName(Some("type")))"""
     )
     res shouldCompile ()
+    (res + "\n" + extra.get) shouldCompile ()
   }
 }
