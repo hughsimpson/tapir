@@ -86,6 +86,11 @@ class BasicGeneratorSpec extends CompileCheckTestBase {
       genWithParams shouldCompile ()
     }
 
+    if (jsonSerdeLib != "jsoniter") it should s"compile the petstore example using ${jsonSerdeLib} serdes" in {
+      val genned = gen(TestHelpers.classicPetstoreExampleDoc, useHeadTagForObjectNames = false, jsonSerdeLib = jsonSerdeLib)
+      genned shouldCompile ()
+    }
+
   }
   Seq("circe", "jsoniter") foreach testJsonLib
 

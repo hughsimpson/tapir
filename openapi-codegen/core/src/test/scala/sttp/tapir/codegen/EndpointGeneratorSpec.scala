@@ -58,7 +58,9 @@ class EndpointGeneratorSpec extends CompileCheckTestBase {
       null
     )
     val generatedCode = BasicGenerator.imports(JsonSerdeLib.Circe) ++
-      new EndpointGenerator().endpointDefs(doc, useHeadTagForObjectNames = false).endpointDecls(None)
+      new EndpointGenerator()
+        .endpointDefs(doc, useHeadTagForObjectNames = false, targetScala3 = false, jsonSerdeLib = JsonSerdeLib.Circe)
+        .endpointDecls(None)
     generatedCode should include("val getTestAsdId =")
     generatedCode shouldCompile ()
   }
@@ -133,7 +135,9 @@ class EndpointGeneratorSpec extends CompileCheckTestBase {
       )
     )
     BasicGenerator.imports(JsonSerdeLib.Circe) ++
-      new EndpointGenerator().endpointDefs(doc, useHeadTagForObjectNames = false).endpointDecls(None) shouldCompile ()
+      new EndpointGenerator()
+        .endpointDefs(doc, useHeadTagForObjectNames = false, targetScala3 = false, jsonSerdeLib = JsonSerdeLib.Circe)
+        .endpointDecls(None) shouldCompile ()
   }
 
   it should "handle status codes" in {
@@ -177,7 +181,9 @@ class EndpointGeneratorSpec extends CompileCheckTestBase {
       null
     )
     val generatedCode = BasicGenerator.imports(JsonSerdeLib.Circe) ++
-      new EndpointGenerator().endpointDefs(doc, useHeadTagForObjectNames = false).endpointDecls(None)
+      new EndpointGenerator()
+        .endpointDefs(doc, useHeadTagForObjectNames = false, targetScala3 = false, jsonSerdeLib = JsonSerdeLib.Circe)
+        .endpointDecls(None)
     generatedCode should include(
       """.out(stringBody.description("Processing").and(statusCode(sttp.model.StatusCode(202))))"""
     ) // status code with body

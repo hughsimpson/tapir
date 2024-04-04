@@ -200,4 +200,14 @@ class ModelParserSpec extends AnyFlatSpec with Matchers with Checkers {
       TestHelpers.oneOfDocsWithMapping
     )
   }
+
+  it should "parse the classic petstore yaml" in {
+    val res = parser
+      .parse(TestHelpers.classicPetstoreExampleYaml)
+      .leftMap(err => err: Error)
+      .flatMap(_.as[OpenapiDocument])
+    res shouldBe Right(
+      TestHelpers.classicPetstoreExampleDoc
+    )
+  }
 }

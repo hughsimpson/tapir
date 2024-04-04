@@ -71,7 +71,8 @@ object OpenapiModels {
       in: String,
       required: Option[Boolean],
       description: Option[String],
-      schema: OpenapiSchemaType
+      schema: OpenapiSchemaType,
+      explode: Option[Boolean] = None
   )
 
   case class OpenapiResponse(

@@ -3,20 +3,10 @@ package sttp.tapir.codegen
 import io.circe.Json
 import sttp.tapir.codegen.openapi.models.OpenapiComponent
 import sttp.tapir.codegen.openapi.models.OpenapiModels._
-import sttp.tapir.codegen.openapi.models.OpenapiSchemaType.{
-  Discriminator,
-  OpenapiSchemaArray,
-  OpenapiSchemaConstantString,
-  OpenapiSchemaEnum,
-  OpenapiSchemaField,
-  OpenapiSchemaFloat,
-  OpenapiSchemaInt,
-  OpenapiSchemaObject,
-  OpenapiSchemaOneOf,
-  OpenapiSchemaRef,
-  OpenapiSchemaString,
-  OpenapiSchemaUUID
-}
+import sttp.tapir.codegen.openapi.models.OpenapiSchemaType._
+import sttp.tapir.codegen.openapi.models.OpenapiSecuritySchemeType.OpenapiSecuritySchemeApiKeyType
+
+import scala.io.Source
 
 object TestHelpers {
 
@@ -1046,4 +1036,656 @@ object TestHelpers {
   val oneOfDocsWithMapping = genOneOfDocs(withDiscriminator = true, withMapping = true)
   val oneOfDocsWithDiscriminatorNoMapping = genOneOfDocs(withDiscriminator = true, withMapping = false)
   val oneOfDocsNoDiscriminator = genOneOfDocs(withDiscriminator = false, withMapping = false)
+
+  def classicPetstoreExampleYaml = Source.fromInputStream(getClass.getResourceAsStream("/petstore.yaml")).getLines().mkString("\n")
+  val classicPetstoreExampleDoc = OpenapiDocument(
+    "3.0.2",
+    OpenapiInfo("Swagger Petstore - OpenAPI 3.0", "1.0.20-SNAPSHOT"),
+    List(
+      OpenapiPath(
+        "/store/order",
+        List(
+          OpenapiPathMethod(
+            "post",
+            List(),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/Order")))
+              ),
+              OpenapiResponse("405", "Invalid input", List())
+            ),
+            Some(
+              OpenapiRequestBody(
+                false,
+                None,
+                List(OpenapiRequestBodyContent("application/json", OpenapiSchemaRef("#/components/schemas/Order")))
+              )
+            ),
+            List(),
+            Some("Place an order for a pet"),
+            Some(List("store")),
+            Some("placeOrder"),
+            Map("swagger-router-controller" -> Json.fromString("OrderController"))
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/pet/findByTags",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(
+              Resolved(
+                OpenapiParameter(
+                  "tags",
+                  "query",
+                  Some(false),
+                  Some("Tags to filter by"),
+                  OpenapiSchemaArray(OpenapiSchemaString(false), false),
+                  Some(true)
+                )
+              )
+            ),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaArray(OpenapiSchemaRef("#/components/schemas/Pet"), false)))
+              ),
+              OpenapiResponse("400", "Invalid tag value", List())
+            ),
+            None,
+            List(),
+            Some("Finds Pets by tags"),
+            Some(List("pet")),
+            Some("findPetsByTags"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/pet",
+        List(
+          OpenapiPathMethod(
+            "put",
+            List(),
+            List(
+              OpenapiResponse(
+                "200",
+                "Successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/Pet")))
+              ),
+              OpenapiResponse("400", "Invalid ID supplied", List()),
+              OpenapiResponse("404", "Pet not found", List()),
+              OpenapiResponse("405", "Validation exception", List())
+            ),
+            Some(
+              OpenapiRequestBody(
+                true,
+                Some("Update an existent pet in the store"),
+                List(OpenapiRequestBodyContent("application/json", OpenapiSchemaRef("#/components/schemas/Pet")))
+              )
+            ),
+            List(),
+            Some("Update an existing pet"),
+            Some(List("pet")),
+            Some("updatePet"),
+            Map()
+          ),
+          OpenapiPathMethod(
+            "post",
+            List(),
+            List(
+              OpenapiResponse(
+                "200",
+                "Successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/Pet")))
+              ),
+              OpenapiResponse("405", "Invalid input", List())
+            ),
+            Some(
+              OpenapiRequestBody(
+                true,
+                Some("Create a new pet in the store"),
+                List(OpenapiRequestBodyContent("application/json", OpenapiSchemaRef("#/components/schemas/Pet")))
+              )
+            ),
+            List(),
+            Some("Add a new pet to the store"),
+            Some(List("pet")),
+            Some("addPet"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/store/order/{orderId}",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(
+              Resolved(
+                OpenapiParameter(
+                  "orderId",
+                  "path",
+                  Some(true),
+                  Some("ID of order that needs to be fetched"),
+                  OpenapiSchemaLong(false),
+                  None
+                )
+              )
+            ),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/Order")))
+              ),
+              OpenapiResponse("400", "Invalid ID supplied", List()),
+              OpenapiResponse("404", "Order not found", List())
+            ),
+            None,
+            List(),
+            Some("Find purchase order by ID"),
+            Some(List("store")),
+            Some("getOrderById"),
+            Map("swagger-router-controller" -> Json.fromString("OrderController"))
+          ),
+          OpenapiPathMethod(
+            "delete",
+            List(
+              Resolved(
+                OpenapiParameter(
+                  "orderId",
+                  "path",
+                  Some(true),
+                  Some("ID of the order that needs to be deleted"),
+                  OpenapiSchemaLong(false),
+                  None
+                )
+              )
+            ),
+            List(OpenapiResponse("400", "Invalid ID supplied", List()), OpenapiResponse("404", "Order not found", List())),
+            None,
+            List(),
+            Some("Delete purchase order by ID"),
+            Some(List("store")),
+            Some("deleteOrder"),
+            Map("swagger-router-controller" -> Json.fromString("OrderController"))
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/user/logout",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(),
+            List(OpenapiResponse("default", "successful operation", List())),
+            None,
+            List(),
+            Some("Logs out current logged in user session"),
+            Some(List("user")),
+            Some("logoutUser"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/store/inventory",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaMap(OpenapiSchemaInt(false), false)))
+              )
+            ),
+            None,
+            List(Vector("api_key")),
+            Some("Returns pet inventories by status"),
+            Some(List("store")),
+            Some("getInventory"),
+            Map("swagger-router-controller" -> Json.fromString("OrderController"))
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/user/createWithList",
+        List(
+          OpenapiPathMethod(
+            "post",
+            List(),
+            List(
+              OpenapiResponse(
+                "200",
+                "Successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/User")))
+              ),
+              OpenapiResponse("default", "successful operation", List())
+            ),
+            Some(
+              OpenapiRequestBody(
+                false,
+                None,
+                List(
+                  OpenapiRequestBodyContent("application/json", OpenapiSchemaArray(OpenapiSchemaRef("#/components/schemas/User"), false))
+                )
+              )
+            ),
+            List(),
+            Some("Creates list of users with given input array"),
+            Some(List("user")),
+            Some("createUsersWithListInput"),
+            Map("swagger-router-controller" -> Json.fromString("UserController"))
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/user/{username}",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(
+              Resolved(
+                OpenapiParameter(
+                  "username",
+                  "path",
+                  Some(true),
+                  Some("The name that needs to be fetched. Use user1 for testing. "),
+                  OpenapiSchemaString(false),
+                  None
+                )
+              )
+            ),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/User")))
+              ),
+              OpenapiResponse("400", "Invalid username supplied", List()),
+              OpenapiResponse("404", "User not found", List())
+            ),
+            None,
+            List(),
+            Some("Get user by user name"),
+            Some(List("user")),
+            Some("getUserByName"),
+            Map()
+          ),
+          OpenapiPathMethod(
+            "put",
+            List(
+              Resolved(
+                OpenapiParameter("username", "path", Some(true), Some("name that needs to be updated"), OpenapiSchemaString(false), None)
+              )
+            ),
+            List(OpenapiResponse("default", "successful operation", List())),
+            Some(
+              OpenapiRequestBody(
+                false,
+                Some("Update an existent user in the store"),
+                List(OpenapiRequestBodyContent("application/json", OpenapiSchemaRef("#/components/schemas/User")))
+              )
+            ),
+            List(),
+            Some("Update user"),
+            Some(List("user")),
+            Some("updateUser"),
+            Map("swagger-router-controller" -> Json.fromString("UserController"))
+          ),
+          OpenapiPathMethod(
+            "delete",
+            List(
+              Resolved(
+                OpenapiParameter(
+                  "username",
+                  "path",
+                  Some(true),
+                  Some("The name that needs to be deleted"),
+                  OpenapiSchemaString(false),
+                  None
+                )
+              )
+            ),
+            List(OpenapiResponse("400", "Invalid username supplied", List()), OpenapiResponse("404", "User not found", List())),
+            None,
+            List(),
+            Some("Delete user"),
+            Some(List("user")),
+            Some("deleteUser"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/user/login",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(
+              Resolved(
+                OpenapiParameter("username", "query", Some(false), Some("The user name for login"), OpenapiSchemaString(false), None)
+              ),
+              Resolved(
+                OpenapiParameter(
+                  "password",
+                  "query",
+                  Some(false),
+                  Some("The password for login in clear text"),
+                  OpenapiSchemaString(false),
+                  None
+                )
+              )
+            ),
+            List(
+              OpenapiResponse("200", "successful operation", List(OpenapiResponseContent("application/json", OpenapiSchemaString(false)))),
+              OpenapiResponse("400", "Invalid username/password supplied", List())
+            ),
+            None,
+            List(),
+            Some("Logs user into the system"),
+            Some(List("user")),
+            Some("loginUser"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/user",
+        List(
+          OpenapiPathMethod(
+            "post",
+            List(),
+            List(
+              OpenapiResponse(
+                "default",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/User")))
+              )
+            ),
+            Some(
+              OpenapiRequestBody(
+                false,
+                Some("Created user object"),
+                List(OpenapiRequestBodyContent("application/json", OpenapiSchemaRef("#/components/schemas/User")))
+              )
+            ),
+            List(),
+            Some("Create user"),
+            Some(List("user")),
+            Some("createUser"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/pet/{petId}",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(Resolved(OpenapiParameter("petId", "path", Some(true), Some("ID of pet to return"), OpenapiSchemaLong(false), None))),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/Pet")))
+              ),
+              OpenapiResponse("400", "Invalid ID supplied", List()),
+              OpenapiResponse("404", "Pet not found", List())
+            ),
+            None,
+            List(Vector("api_key")),
+            Some("Find pet by ID"),
+            Some(List("pet")),
+            Some("getPetById"),
+            Map()
+          ),
+          OpenapiPathMethod(
+            "post",
+            List(
+              Resolved(
+                OpenapiParameter("petId", "path", Some(true), Some("ID of pet that needs to be updated"), OpenapiSchemaLong(false), None)
+              ),
+              Resolved(
+                OpenapiParameter("name", "query", None, Some("Name of pet that needs to be updated"), OpenapiSchemaString(false), None)
+              ),
+              Resolved(
+                OpenapiParameter("status", "query", None, Some("Status of pet that needs to be updated"), OpenapiSchemaString(false), None)
+              )
+            ),
+            List(OpenapiResponse("405", "Invalid input", List())),
+            None,
+            List(),
+            Some("Updates a pet in the store with form data"),
+            Some(List("pet")),
+            Some("updatePetWithForm"),
+            Map()
+          ),
+          OpenapiPathMethod(
+            "delete",
+            List(
+              Resolved(OpenapiParameter("api_key", "header", Some(false), Some(""), OpenapiSchemaString(false), None)),
+              Resolved(OpenapiParameter("petId", "path", Some(true), Some("Pet id to delete"), OpenapiSchemaLong(false), None))
+            ),
+            List(OpenapiResponse("400", "Invalid pet value", List())),
+            None,
+            List(),
+            Some("Deletes a pet"),
+            Some(List("pet")),
+            Some("deletePet"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/pet/{petId}/uploadImage",
+        List(
+          OpenapiPathMethod(
+            "post",
+            List(
+              Resolved(OpenapiParameter("petId", "path", Some(true), Some("ID of pet to update"), OpenapiSchemaLong(false), None)),
+              Resolved(
+                OpenapiParameter("additionalMetadata", "query", Some(false), Some("Additional Metadata"), OpenapiSchemaString(false), None)
+              )
+            ),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaRef("#/components/schemas/ApiResponse")))
+              )
+            ),
+            Some(OpenapiRequestBody(false, None, List(OpenapiRequestBodyContent("application/octet-stream", OpenapiSchemaBinary(false))))),
+            List(),
+            Some("uploads an image"),
+            Some(List("pet")),
+            Some("uploadFile"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      ),
+      OpenapiPath(
+        "/pet/findByStatus",
+        List(
+          OpenapiPathMethod(
+            "get",
+            List(
+              Resolved(
+                OpenapiParameter(
+                  "status",
+                  "query",
+                  Some(false),
+                  Some("Status values that need to be considered for filter"),
+                  OpenapiSchemaEnum(
+                    "string",
+                    List(
+                      OpenapiSchemaConstantString("available"),
+                      OpenapiSchemaConstantString("pending"),
+                      OpenapiSchemaConstantString("sold")
+                    ),
+                    false
+                  ),
+                  Some(true)
+                )
+              )
+            ),
+            List(
+              OpenapiResponse(
+                "200",
+                "successful operation",
+                List(OpenapiResponseContent("application/json", OpenapiSchemaArray(OpenapiSchemaRef("#/components/schemas/Pet"), false)))
+              ),
+              OpenapiResponse("400", "Invalid status value", List())
+            ),
+            None,
+            List(),
+            Some("Finds Pets by status"),
+            Some(List("pet")),
+            Some("findPetsByStatus"),
+            Map()
+          )
+        ),
+        List(),
+        Map()
+      )
+    ),
+    Some(
+      OpenapiComponent(
+        Map(
+          "Pet" -> OpenapiSchemaObject(
+            Map(
+              "name" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "tags" -> OpenapiSchemaField(OpenapiSchemaArray(OpenapiSchemaRef("#/components/schemas/Tag"), false), None),
+              "photoUrls" -> OpenapiSchemaField(OpenapiSchemaArray(OpenapiSchemaString(false), false), None),
+              "id" -> OpenapiSchemaField(OpenapiSchemaLong(false), None),
+              "status" -> OpenapiSchemaField(
+                OpenapiSchemaEnum(
+                  "string",
+                  List(
+                    OpenapiSchemaConstantString("available"),
+                    OpenapiSchemaConstantString("pending"),
+                    OpenapiSchemaConstantString("sold")
+                  ),
+                  false
+                ),
+                None
+              ),
+              "category" -> OpenapiSchemaField(OpenapiSchemaRef("#/components/schemas/Category"), None)
+            ),
+            List("name", "photoUrls"),
+            false
+          ),
+          "Category" -> OpenapiSchemaObject(
+            Map("id" -> OpenapiSchemaField(OpenapiSchemaLong(false), None), "name" -> OpenapiSchemaField(OpenapiSchemaString(false), None)),
+            List(),
+            false
+          ),
+          "Address" -> OpenapiSchemaObject(
+            Map(
+              "street" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "city" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "state" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "zip" -> OpenapiSchemaField(OpenapiSchemaString(false), None)
+            ),
+            List(),
+            false
+          ),
+          "Tag" -> OpenapiSchemaObject(
+            Map("id" -> OpenapiSchemaField(OpenapiSchemaLong(false), None), "name" -> OpenapiSchemaField(OpenapiSchemaString(false), None)),
+            List(),
+            false
+          ),
+          "Customer" -> OpenapiSchemaObject(
+            Map(
+              "id" -> OpenapiSchemaField(OpenapiSchemaLong(false), None),
+              "username" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "address" -> OpenapiSchemaField(OpenapiSchemaArray(OpenapiSchemaRef("#/components/schemas/Address"), false), None)
+            ),
+            List(),
+            false
+          ),
+          "User" -> OpenapiSchemaObject(
+            Map(
+              "email" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "username" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "userStatus" -> OpenapiSchemaField(OpenapiSchemaInt(false), None),
+              "lastName" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "firstName" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "id" -> OpenapiSchemaField(OpenapiSchemaLong(false), None),
+              "phone" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "password" -> OpenapiSchemaField(OpenapiSchemaString(false), None)
+            ),
+            List(),
+            false
+          ),
+          "Order" -> OpenapiSchemaObject(
+            Map(
+              "shipDate" -> OpenapiSchemaField(OpenapiSchemaDateTime(false), None),
+              "quantity" -> OpenapiSchemaField(OpenapiSchemaInt(false), None),
+              "petId" -> OpenapiSchemaField(OpenapiSchemaLong(false), None),
+              "id" -> OpenapiSchemaField(OpenapiSchemaLong(false), None),
+              "complete" -> OpenapiSchemaField(OpenapiSchemaBoolean(false), None),
+              "status" -> OpenapiSchemaField(
+                OpenapiSchemaEnum(
+                  "string",
+                  List(
+                    OpenapiSchemaConstantString("placed"),
+                    OpenapiSchemaConstantString("approved"),
+                    OpenapiSchemaConstantString("delivered")
+                  ),
+                  false
+                ),
+                None
+              )
+            ),
+            List(),
+            false
+          ),
+          "ApiResponse" -> OpenapiSchemaObject(
+            Map(
+              "code" -> OpenapiSchemaField(OpenapiSchemaInt(false), None),
+              "type" -> OpenapiSchemaField(OpenapiSchemaString(false), None),
+              "message" -> OpenapiSchemaField(OpenapiSchemaString(false), None)
+            ),
+            List(),
+            false
+          )
+        ),
+        Map("api_key" -> OpenapiSecuritySchemeApiKeyType("header", "api_key")),
+        Map()
+      )
+    )
+  )
+
 }

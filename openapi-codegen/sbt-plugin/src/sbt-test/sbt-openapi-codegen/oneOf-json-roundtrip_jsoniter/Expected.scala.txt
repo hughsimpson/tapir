@@ -58,6 +58,6 @@ object TapirGeneratedEndpoints {
       .out(jsonBody[ADTWithDiscriminator].description("successful operation"))
 
 
-  lazy val generatedEndpoints = List(putAdtTest, postAdtTest)
+  lazy val generatedEndpoints: List[sttp.tapir.AnyEndpoint] = List(putAdtTest, postAdtTest)
 
 }
