@@ -86,7 +86,8 @@ object BasicGenerator {
       enumsDefinedOnEndpointParams,
       inlineDefns,
       xmlParamRefs,
-      securityWrappers
+      securityWrappers,
+      formParamRefs
     ) =
       endpointGenerator.endpointDefs(
         doc,
@@ -106,6 +107,7 @@ object BasicGenerator {
           jsonSerdeLib = normalisedJsonLib,
           xmlSerdeLib = normalisedXmlLib,
           jsonParamRefs = jsonParamRefs,
+          formParamRefs = formParamRefs,
           fullModelPath = s"$packagePath.$objName",
           validateNonDiscriminatedOneOfs = validateNonDiscriminatedOneOfs,
           maxSchemasPerFile = maxSchemasPerFile,
@@ -195,7 +197,15 @@ object BasicGenerator {
       .mkString("\n")
 
     val expectedTypes =
-      Set("text/plain", "text/html", "application/json", "application/xml", "multipart/form-data", "application/octet-stream")
+      Set(
+        "text/plain",
+        "text/html",
+        "application/json",
+        "application/xml",
+        "multipart/form-data",
+        "application/octet-stream",
+        "application/x-www-form-urlencoded"
+      )
     val mediaType = "([^/]+)/(.+)".r
     val customTypes = doc.paths
       .flatMap(
@@ -248,6 +258,16 @@ object BasicGenerator {
       |}
       |implicit def makeExplodedQuerySeqCodecFromListSeq[T](implicit support: sttp.tapir.Codec[List[String], List[T], sttp.tapir.CodecFormat.TextPlain]): sttp.tapir.Codec[List[String], ExplodedValues[T], sttp.tapir.CodecFormat.TextPlain] = {
       |  support.mapDecode(l => DecodeResult.Value(ExplodedValues(l)))(_.values)
+      |}
+      |implicit def makeFormBodySeqCodecFromListCodec[T](implicit support: sttp.tapir.Codec[List[String], List[T], sttp.tapir.CodecFormat.TextPlain]): sttp.tapir.Codec[List[String], Seq[T], sttp.tapir.CodecFormat.TextPlain] = {
+      |  support.map[Seq[T]]((_: List[T]).toSeq)((_: Seq[T]).toList)
+      |}
+      |implicit def makeFormBodyOptSeqCodecFromSupport[T](implicit support: ExtraParamSupport[T]): sttp.tapir.Codec[List[String], Option[Seq[T]], sttp.tapir.CodecFormat.TextPlain] = {
+      |  sttp.tapir.Codec.listHeadOption[String, String, sttp.tapir.CodecFormat.TextPlain]
+      |    .mapDecode {
+      |      case None => DecodeResult.Value(None)
+      |      case Some(s) => DecodeResult.sequence(java.net.URLDecoder.decode(s).split(",").toSeq.map(support.decode)).map(Some(_))
+      |    }(_.map(s => java.net.URLEncoder.encode(s.map(support.encode).mkString(","))))
       |}
       |""".stripMargin
 

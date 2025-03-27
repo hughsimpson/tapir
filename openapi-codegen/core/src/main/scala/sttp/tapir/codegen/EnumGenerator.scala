@@ -13,7 +13,8 @@ object EnumGenerator {
       targetScala3: Boolean,
       queryParamRefs: Set[String],
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
-      jsonParamRefs: Set[String]
+      jsonParamRefs: Set[String],
+      formParamRefs: Set[String]
   ): Seq[String] = {
     def maybeEscaped(s: String) = s match {
       case legalEnumName(l) => l
@@ -52,7 +53,7 @@ object EnumGenerator {
         case JsonSerdeLib.Jsoniter | JsonSerdeLib.Zio                             => ""
       }
       val maybeQueryCodecDefn =
-        if (queryParamRefs contains name) {
+        if (queryParamRefs.contains(name) || formParamRefs.contains(name)) {
           s"""
                |  implicit val enumCodecSupport${name.capitalize}: ExtraParamSupport[$name] =
                |    extraCodecSupport[$name]("${name}", ${name})""".stripMargin

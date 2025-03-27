@@ -2,7 +2,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import sttp.client3.UriContext
 import sttp.client3.testing.SttpBackendStub
-import sttp.tapir.generated.TapirGeneratedEndpoints
+import sttp.tapir.generated.{TapirGeneratedEndpoints, TapirGeneratedEndpointsXmlSerdes}
 import sttp.tapir.generated.TapirGeneratedEndpoints.OrderStatus.placed
 import sttp.tapir.generated.TapirGeneratedEndpoints._
 import sttp.tapir.server.stub.TapirStubInterpreter
@@ -126,22 +126,9 @@ class XmlRoundtrip extends AnyFreeSpec with Matchers {
       .serverSecurityLogic[Unit, Future](_ => Future.successful(Right(())))
       .serverLogic { _ =>
         {
-          case PlaceOrderBodyOption_Order_In(Some(o)) =>
+          case Some(o) =>
             Future successful Right(o)
-          case PlaceOrderBodyOption_Order_In(None)                 => Future.successful(Right(Order()))
-          case PlaceOrderBody2In(bytes) if bytes.isEmpty => Future.successful(Right(Order()))
-          case PlaceOrderBody2In(bytes) =>
-            val m = new String(bytes, "utf-8").split('&').map(_.split("=", 2)).map { case Array(k, v) => k -> v }.toMap
-            Future(
-              Order(
-                id = m.get("id").map(_.toLong),
-                status = m.get("status").map(TapirGeneratedEndpoints.OrderStatus.withName),
-                shipDate = m.get("shipDate").map(Instant.parse),
-                quantity = m.get("quantity").map(_.toInt),
-                complete = m.get("complete").map(_.toBoolean),
-                petId = m.get("petId").map(_.toLong)
-              )
-            ).map(Right(_))
+          case None => Future.successful(Right(Order()))
         }
       }
 

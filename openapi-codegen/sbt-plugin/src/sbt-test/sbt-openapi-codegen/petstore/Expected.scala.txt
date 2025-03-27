@@ -13,9 +13,6 @@ object TapirGeneratedEndpoints {
   import sttp.tapir.generated.TapirGeneratedEndpointsXmlSerdes._
   import TapirGeneratedEndpointsSchemas._
 
-  case class `application/x-www-form-urlencodedCodecFormat`() extends CodecFormat {
-    override val mediaType: sttp.model.MediaType = sttp.model.MediaType.unsafeApply(mainType = "application", subType = "x-www-form-urlencoded")
-  }
   sealed trait Bearer_or_api_key_SecurityIn
   case class BearerSecurityIn(value: String) extends Bearer_or_api_key_SecurityIn
   case class Api_keySecurityIn(value: String) extends Bearer_or_api_key_SecurityIn
@@ -51,6 +48,16 @@ object TapirGeneratedEndpoints {
   implicit def makeExplodedQuerySeqCodecFromListSeq[T](implicit support: sttp.tapir.Codec[List[String], List[T], sttp.tapir.CodecFormat.TextPlain]): sttp.tapir.Codec[List[String], ExplodedValues[T], sttp.tapir.CodecFormat.TextPlain] = {
     support.mapDecode(l => DecodeResult.Value(ExplodedValues(l)))(_.values)
   }
+  implicit def makeFormBodySeqCodecFromListCodec[T](implicit support: sttp.tapir.Codec[List[String], List[T], sttp.tapir.CodecFormat.TextPlain]): sttp.tapir.Codec[List[String], Seq[T], sttp.tapir.CodecFormat.TextPlain] = {
+    support.map[Seq[T]]((_: List[T]).toSeq)((_: Seq[T]).toList)
+  }
+  implicit def makeFormBodyOptSeqCodecFromSupport[T](implicit support: ExtraParamSupport[T]): sttp.tapir.Codec[List[String], Option[Seq[T]], sttp.tapir.CodecFormat.TextPlain] = {
+    sttp.tapir.Codec.listHeadOption[String, String, sttp.tapir.CodecFormat.TextPlain]
+      .mapDecode {
+        case None => DecodeResult.Value(None)
+        case Some(s) => DecodeResult.sequence(java.net.URLDecoder.decode(s).split(",").toSeq.map(support.decode)).map(Some(_))
+      }(_.map(s => java.net.URLEncoder.encode(s.map(support.encode).mkString(","))))
+  }
   implicit class RichBody[A, T](bod: EndpointIO.Body[A, T]) {
     def widenBody[TT >: T]: EndpointIO.Body[A, TT] = bod.map(_.asInstanceOf[TT])(_.asInstanceOf[T])
   }
@@ -76,6 +83,13 @@ object TapirGeneratedEndpoints {
   }
   def extraCodecSupport[T <: enumeratum.EnumEntry](enumName: String, T: enumeratum.Enum[T]): ExtraParamSupport[T] =
     EnumExtraParamSupport(enumName, T)
+  object Pet {
+    implicit val PetFormSupport: ExtraParamSupport[Pet] = new ExtraParamSupport[Pet] {
+      private val delegate = sttp.tapir.Codec.formCaseClassCodec[Pet]
+      def decode(s: String): sttp.tapir.DecodeResult[Pet] = delegate.decode(java.net.URLDecoder.decode(s))
+      def encode(t: Pet): String = java.net.URLEncoder.encode(delegate.encode(t))
+    }
+  }
   case class Pet (
     status: Option[PetStatus] = None,
     tags: Option[Seq[Tag]] = None,
@@ -91,15 +105,38 @@ object TapirGeneratedEndpoints {
     case object available extends PetStatus
     case object pending extends PetStatus
     case object sold extends PetStatus
+    implicit val enumCodecSupportPetStatus: ExtraParamSupport[PetStatus] =
+      extraCodecSupport[PetStatus]("PetStatus", PetStatus)
+  }
+  object Category {
+    implicit val CategoryFormSupport: ExtraParamSupport[Category] = new ExtraParamSupport[Category] {
+      private val delegate = sttp.tapir.Codec.formCaseClassCodec[Category]
+      def decode(s: String): sttp.tapir.DecodeResult[Category] = delegate.decode(java.net.URLDecoder.decode(s))
+      def encode(t: Category): String = java.net.URLEncoder.encode(delegate.encode(t))
+    }
   }
   case class Category (
     id: Option[Long] = None,
     name: Option[String] = None
   )
+  object Tag {
+    implicit val TagFormSupport: ExtraParamSupport[Tag] = new ExtraParamSupport[Tag] {
+      private val delegate = sttp.tapir.Codec.formCaseClassCodec[Tag]
+      def decode(s: String): sttp.tapir.DecodeResult[Tag] = delegate.decode(java.net.URLDecoder.decode(s))
+      def encode(t: Tag): String = java.net.URLEncoder.encode(delegate.encode(t))
+    }
+  }
   case class Tag (
     id: Option[Long] = None,
     name: Option[String] = None
   )
+  object User {
+    implicit val UserFormSupport: ExtraParamSupport[User] = new ExtraParamSupport[User] {
+      private val delegate = sttp.tapir.Codec.formCaseClassCodec[User]
+      def decode(s: String): sttp.tapir.DecodeResult[User] = delegate.decode(java.net.URLDecoder.decode(s))
+      def encode(t: User): String = java.net.URLEncoder.encode(delegate.encode(t))
+    }
+  }
   case class User (
     userStatus: Option[Int] = None,
     phone: Option[String] = None,
@@ -110,6 +147,13 @@ object TapirGeneratedEndpoints {
     email: Option[String] = None,
     firstName: Option[String] = None
   )
+  object Order {
+    implicit val OrderFormSupport: ExtraParamSupport[Order] = new ExtraParamSupport[Order] {
+      private val delegate = sttp.tapir.Codec.formCaseClassCodec[Order]
+      def decode(s: String): sttp.tapir.DecodeResult[Order] = delegate.decode(java.net.URLDecoder.decode(s))
+      def encode(t: Order): String = java.net.URLEncoder.encode(delegate.encode(t))
+    }
+  }
   case class Order (
     id: Option[Long] = None,
     status: Option[OrderStatus] = None,
@@ -125,6 +169,8 @@ object TapirGeneratedEndpoints {
     case object placed extends OrderStatus
     case object approved extends OrderStatus
     case object delivered extends OrderStatus
+    implicit val enumCodecSupportOrderStatus: ExtraParamSupport[OrderStatus] =
+      extraCodecSupport[OrderStatus]("OrderStatus", OrderStatus)
   }
   case class ApiResponse (
     code: Option[Int] = None,
@@ -132,36 +178,12 @@ object TapirGeneratedEndpoints {
     message: Option[String] = None
   )
 
-  sealed trait PlaceOrderBodyIn extends Product with java.io.Serializable
-  case class PlaceOrderBodyOption_Order_In(value: Option[Order]) extends PlaceOrderBodyIn
-  case class PlaceOrderBody2In(value: Array[Byte]) extends PlaceOrderBodyIn
-
   type FindPetsByTagsResponse <: Seq[Pet]
   implicit val FindPetsByTagsResponseSeqDecoder: cats.xml.codec.Decoder[FindPetsByTagsResponse] = seqDecoder[Pet]("Pet", isWrapped = false).map(_.asInstanceOf[FindPetsByTagsResponse])
   implicit val FindPetsByTagsResponseSeqEncoder: cats.xml.codec.Encoder[FindPetsByTagsResponse] =
     seqEncoder[Pet]("Pet", isWrapped = false, itemName = "Pet").contramap(_.asInstanceOf[Seq[Pet]])
   implicit val FindPetsByTagsResponseSeqSchema: sttp.tapir.Schema[FindPetsByTagsResponse] =
     implicitly[Schema[Seq[Pet]]].map(x => Some(x.asInstanceOf[FindPetsByTagsResponse]))(_.asInstanceOf[Seq[Pet]])
-
-  sealed trait UpdatePetBodyIn extends Product with java.io.Serializable
-  case class UpdatePetBodyPetIn(value: Pet) extends UpdatePetBodyIn
-  case class UpdatePetBody2In(value: Array[Byte]) extends UpdatePetBodyIn
-
-
-  sealed trait AddPetBodyIn extends Product with java.io.Serializable
-  case class AddPetBodyPetIn(value: Pet) extends AddPetBodyIn
-  case class AddPetBody2In(value: Array[Byte]) extends AddPetBodyIn
-
-
-  sealed trait UpdateUserBodyIn extends Product with java.io.Serializable
-  case class UpdateUserBodyOption_User_In(value: Option[User]) extends UpdateUserBodyIn
-  case class UpdateUserBody2In(value: Array[Byte]) extends UpdateUserBodyIn
-
-
-  sealed trait CreateUserBodyIn extends Product with java.io.Serializable
-  case class CreateUserBodyOption_User_In(value: Option[User]) extends CreateUserBodyIn
-  case class CreateUserBody2In(value: Array[Byte]) extends CreateUserBodyIn
-
   type FindPetsByStatusResponse <: Seq[Pet]
   implicit val FindPetsByStatusResponseSeqDecoder: cats.xml.codec.Decoder[FindPetsByStatusResponse] = seqDecoder[Pet]("Pet", isWrapped = false).map(_.asInstanceOf[FindPetsByStatusResponse])
   implicit val FindPetsByStatusResponseSeqEncoder: cats.xml.codec.Encoder[FindPetsByStatusResponse] =
@@ -172,15 +194,15 @@ object TapirGeneratedEndpoints {
   type SwaggerRouterControllerExtension = String
   val swaggerRouterControllerExtensionKey = new sttp.tapir.AttributeKey[SwaggerRouterControllerExtension]("sttp.tapir.generated.TapirGeneratedEndpoints.SwaggerRouterControllerExtension")
 
-  type PlaceOrderEndpoint = Endpoint[Unit, PlaceOrderBodyIn, Unit, Order, Any]
+  type PlaceOrderEndpoint = Endpoint[Unit, Option[Order], Unit, Order, Any]
   lazy val placeOrder: PlaceOrderEndpoint =
     endpoint
       .post
       .in(("store" / "order"))
-      .in(oneOfBody[PlaceOrderBodyIn](
-        jsonBody[Option[Order]].map(PlaceOrderBodyOption_Order_In(_))(_.value).widenBody[PlaceOrderBodyIn],
-        xmlBody[Option[Order]].map(PlaceOrderBodyOption_Order_In(_))(_.value).widenBody[PlaceOrderBodyIn],
-        EndpointIO.Body(RawBodyType.ByteArrayBody, Codec.id[Array[Byte], `application/x-www-form-urlencodedCodecFormat`](`application/x-www-form-urlencodedCodecFormat`(), Schema.schemaForByteArray), EndpointIO.Info.empty).map(PlaceOrderBody2In(_))(_.value).widenBody[PlaceOrderBodyIn]))
+      .in(oneOfBody[Option[Order]](
+        jsonBody[Option[Order]],
+        xmlBody[Option[Order]],
+        formBody[Order].map[Option[Order]](Option(_: Order))(_.orNull)))
       .errorOut(oneOf[Unit](
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(400), emptyOutput.description("Invalid input"))(()),
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(422), emptyOutput.description("Validation exception"))(()),
@@ -204,16 +226,16 @@ object TapirGeneratedEndpoints {
         xmlBody[FindPetsByTagsResponse].map(_.asInstanceOf[List[Pet]].toList)(_.asInstanceOf[FindPetsByTagsResponse]).description("successful operation")))
       .tags(List("pet"))
 
-  type UpdatePetEndpoint = Endpoint[String, UpdatePetBodyIn, Unit, Pet, Any]
+  type UpdatePetEndpoint = Endpoint[String, Pet, Unit, Pet, Any]
   lazy val updatePet: UpdatePetEndpoint =
     endpoint
       .put
       .in(("pet"))
       .securityIn(auth.oauth2.implicitFlow("https://petstore3.swagger.io/oauth/authorize", None))
-      .in(oneOfBody[UpdatePetBodyIn](
-        jsonBody[Pet].map(UpdatePetBodyPetIn(_))(_.value).widenBody[UpdatePetBodyIn].description("Update an existent pet in the store"),
-        xmlBody[Pet].map(UpdatePetBodyPetIn(_))(_.value).widenBody[UpdatePetBodyIn].description("Update an existent pet in the store"),
-        EndpointIO.Body(RawBodyType.ByteArrayBody, Codec.id[Array[Byte], `application/x-www-form-urlencodedCodecFormat`](`application/x-www-form-urlencodedCodecFormat`(), Schema.schemaForByteArray), EndpointIO.Info.empty).map(UpdatePetBody2In(_))(_.value).widenBody[UpdatePetBodyIn].description("Update an existent pet in the store")))
+      .in(oneOfBody[Pet](
+        jsonBody[Pet].description("Update an existent pet in the store"),
+        xmlBody[Pet].description("Update an existent pet in the store"),
+        formBody[Pet].description("Update an existent pet in the store")))
       .errorOut(oneOf[Unit](
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(400), emptyOutput.description("Invalid ID supplied"))(()),
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(404), emptyOutput.description("Pet not found"))(()),
@@ -224,16 +246,16 @@ object TapirGeneratedEndpoints {
         xmlBody[Pet].description("Successful operation")))
       .tags(List("pet"))
 
-  type AddPetEndpoint = Endpoint[String, AddPetBodyIn, Unit, Pet, Any]
+  type AddPetEndpoint = Endpoint[String, Pet, Unit, Pet, Any]
   lazy val addPet: AddPetEndpoint =
     endpoint
       .post
       .in(("pet"))
       .securityIn(auth.oauth2.implicitFlow("https://petstore3.swagger.io/oauth/authorize", None))
-      .in(oneOfBody[AddPetBodyIn](
-        jsonBody[Pet].map(AddPetBodyPetIn(_))(_.value).widenBody[AddPetBodyIn].description("Create a new pet in the store"),
-        xmlBody[Pet].map(AddPetBodyPetIn(_))(_.value).widenBody[AddPetBodyIn].description("Create a new pet in the store"),
-        EndpointIO.Body(RawBodyType.ByteArrayBody, Codec.id[Array[Byte], `application/x-www-form-urlencodedCodecFormat`](`application/x-www-form-urlencodedCodecFormat`(), Schema.schemaForByteArray), EndpointIO.Info.empty).map(AddPetBody2In(_))(_.value).widenBody[AddPetBodyIn].description("Create a new pet in the store")))
+      .in(oneOfBody[Pet](
+        jsonBody[Pet].description("Create a new pet in the store"),
+        xmlBody[Pet].description("Create a new pet in the store"),
+        formBody[Pet].description("Create a new pet in the store")))
       .errorOut(oneOf[Unit](
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(400), emptyOutput.description("Invalid input"))(()),
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(422), emptyOutput.description("Validation exception"))(()),
@@ -313,15 +335,15 @@ object TapirGeneratedEndpoints {
         xmlBody[User].description("successful operation")))
       .tags(List("user"))
 
-  type UpdateUserEndpoint = Endpoint[Unit, (String, UpdateUserBodyIn), Unit, Unit, Any]
+  type UpdateUserEndpoint = Endpoint[Unit, (String, Option[User]), Unit, Unit, Any]
   lazy val updateUser: UpdateUserEndpoint =
     endpoint
       .put
       .in(("user" / path[String]("username").description("name that need to be deleted")))
-      .in(oneOfBody[UpdateUserBodyIn](
-        jsonBody[Option[User]].map(UpdateUserBodyOption_User_In(_))(_.value).widenBody[UpdateUserBodyIn].description("Update an existent user in the store"),
-        xmlBody[Option[User]].map(UpdateUserBodyOption_User_In(_))(_.value).widenBody[UpdateUserBodyIn].description("Update an existent user in the store"),
-        EndpointIO.Body(RawBodyType.ByteArrayBody, Codec.id[Array[Byte], `application/x-www-form-urlencodedCodecFormat`](`application/x-www-form-urlencodedCodecFormat`(), Schema.schemaForByteArray), EndpointIO.Info.empty).map(UpdateUserBody2In(_))(_.value).widenBody[UpdateUserBodyIn].description("Update an existent user in the store")))
+      .in(oneOfBody[Option[User]](
+        jsonBody[Option[User]].description("Update an existent user in the store"),
+        xmlBody[Option[User]].description("Update an existent user in the store"),
+        formBody[User].map[Option[User]](Option(_: User))(_.orNull).description("Update an existent user in the store")))
       .errorOut(oneOf[Unit](
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(400), emptyOutput.description("bad request"))(()),
         oneOfVariantSingletonMatcher(sttp.model.StatusCode(404), emptyOutput.description("user not found"))(()),
@@ -355,15 +377,15 @@ object TapirGeneratedEndpoints {
         jsonBody[String].description("successful operation")).and(header[Option[Int]]("X-Rate-Limit").description("calls per hour allowed by the user")).and(header[Option[java.time.Instant]]("X-Expires-After").description("date in UTC when token expires")))
       .tags(List("user"))
 
-  type CreateUserEndpoint = Endpoint[Unit, CreateUserBodyIn, Unit, User, Any]
+  type CreateUserEndpoint = Endpoint[Unit, Option[User], Unit, User, Any]
   lazy val createUser: CreateUserEndpoint =
     endpoint
       .post
       .in(("user"))
-      .in(oneOfBody[CreateUserBodyIn](
-        jsonBody[Option[User]].map(CreateUserBodyOption_User_In(_))(_.value).widenBody[CreateUserBodyIn].description("Created user object"),
-        xmlBody[Option[User]].map(CreateUserBodyOption_User_In(_))(_.value).widenBody[CreateUserBodyIn].description("Created user object"),
-        EndpointIO.Body(RawBodyType.ByteArrayBody, Codec.id[Array[Byte], `application/x-www-form-urlencodedCodecFormat`](`application/x-www-form-urlencodedCodecFormat`(), Schema.schemaForByteArray), EndpointIO.Info.empty).map(CreateUserBody2In(_))(_.value).widenBody[CreateUserBodyIn].description("Created user object")))
+      .in(oneOfBody[Option[User]](
+        jsonBody[Option[User]].description("Created user object"),
+        xmlBody[Option[User]].description("Created user object"),
+        formBody[User].map[Option[User]](Option(_: User))(_.orNull).description("Created user object")))
       .out(oneOfBody[User](
         jsonBody[User].description("successful operation"),
         xmlBody[User].description("successful operation")))

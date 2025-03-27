@@ -26,6 +26,7 @@ class ClassDefinitionGenerator {
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib = Circe,
       xmlSerdeLib: XmlSerdeLib.XmlSerdeLib = XmlSerdeLib.CatsXml,
       jsonParamRefs: Set[String] = Set.empty,
+      formParamRefs: Set[String] = Set.empty,
       fullModelPath: String = "",
       validateNonDiscriminatedOneOfs: Boolean = true,
       maxSchemasPerFile: Int = 400,
@@ -48,6 +49,11 @@ class ClassDefinitionGenerator {
     val allTransitiveJsonParamRefs = fetchTransitiveParamRefs(
       jsonParamRefs,
       jsonParamRefs.toSeq.flatMap(ref => allSchemas.get(ref.stripPrefix("#/components/schemas/")))
+    )
+
+    val allTransitiveFormParamRefs = fetchTransitiveParamRefs(
+      formParamRefs,
+      formParamRefs.toSeq.flatMap(ref => allSchemas.get(ref.stripPrefix("#/components/schemas/")))
     )
 
     val adtTypes = adtInheritanceMap.flatMap(_._2).toSeq.map(_._1).distinct.map(name => s"sealed trait $name").mkString("", "\n", "\n")
@@ -77,9 +83,26 @@ class ClassDefinitionGenerator {
     val defns = doc.components
       .map(_.schemas.flatMap {
         case (name, obj: OpenapiSchemaObject) =>
-          generateClass(allSchemas, name, obj, allTransitiveJsonParamRefs, adtInheritanceMap, jsonSerdeLib, targetScala3)
+          generateClass(
+            allSchemas,
+            name,
+            obj,
+            allTransitiveJsonParamRefs,
+            allTransitiveFormParamRefs,
+            adtInheritanceMap,
+            jsonSerdeLib,
+            targetScala3
+          )
         case (name, obj: OpenapiSchemaEnum) =>
-          EnumGenerator.generateEnum(name, obj, targetScala3, queryOrPathParamRefs, jsonSerdeLib, allTransitiveJsonParamRefs)
+          EnumGenerator.generateEnum(
+            name,
+            obj,
+            targetScala3,
+            queryOrPathParamRefs,
+            jsonSerdeLib,
+            allTransitiveJsonParamRefs,
+            allTransitiveFormParamRefs
+          )
         case (name, OpenapiSchemaMap(valueSchema, _))      => generateMap(name, valueSchema)
         case (name, OpenapiSchemaArray(valueSchema, _, _)) => generateArray(name, valueSchema)
         case (_, _: OpenapiSchemaOneOf)                    => Nil
@@ -237,11 +260,13 @@ class ClassDefinitionGenerator {
       name: String,
       obj: OpenapiSchemaObject,
       jsonParamRefs: Set[String],
+      formParamRefs: Set[String],
       adtInheritanceMap: Map[String, Seq[(String, OpenapiSchemaOneOf)]],
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
       targetScala3: Boolean
   ): Seq[String] = try {
     val isJson = jsonParamRefs contains name
+    val isForm = formParamRefs contains name
     def rec(name: String, obj: OpenapiSchemaObject, acc: List[String]): Seq[String] = {
       val innerClasses = obj.properties
         .collect {
@@ -284,7 +309,8 @@ class ClassDefinitionGenerator {
       val (properties, maybeEnums) = obj.properties
         .filterNot(discriminatorDefFields.map(_._1) contains _._1)
         .map { case (key, OpenapiSchemaField(schemaType, maybeDefault)) =>
-          val (tpe, maybeEnum) = mapSchemaTypeToType(name, key, obj.required.contains(key), schemaType, isJson, jsonSerdeLib, targetScala3)
+          val (tpe, maybeEnum) =
+            mapSchemaTypeToType(name, key, obj.required.contains(key), schemaType, isJson, isForm, jsonSerdeLib, targetScala3)
           val fixedKey = fixKey(key)
           val optional = schemaType.nullable || !obj.required.contains(key)
           val maybeExplicitDefault =
@@ -299,7 +325,18 @@ class ClassDefinitionGenerator {
         .unzip
 
       val enumDefn = maybeEnums.flatten.toList
-      s"""|case class $name (
+      val formSupport =
+        if (formParamRefs.contains(name)) {
+          s"""object $name {
+           |  implicit val ${name}FormSupport: ExtraParamSupport[$name] = new ExtraParamSupport[$name] {
+           |    private val delegate = sttp.tapir.Codec.formCaseClassCodec[$name]
+           |    def decode(s: String): sttp.tapir.DecodeResult[$name] = delegate.decode(java.net.URLDecoder.decode(s))
+           |    def encode(t: $name): String = java.net.URLEncoder.encode(delegate.encode(t))
+           |  }
+           |}
+           |""".stripMargin
+        } else ""
+      s"""|${formSupport}case class $name (
           |${indent(2)(properties.mkString(",\n"))}
           |)$parents$discriminatorDefBody""".stripMargin :: innerClasses ::: enumDefn ::: acc
     }
@@ -315,6 +352,7 @@ class ClassDefinitionGenerator {
       required: Boolean,
       schemaType: OpenapiSchemaType,
       isJson: Boolean,
+      isForm: Boolean,
       jsonSerdeLib: JsonSerdeLib.JsonSerdeLib,
       targetScala3: Boolean
   ): (String, Option[InlineEnumDefn]) = {
@@ -327,7 +365,16 @@ class ClassDefinitionGenerator {
 
       case mapType: OpenapiSchemaMap =>
         val (innerType, maybeEnum) =
-          mapSchemaTypeToType(addName(parentName, key), "item", required = true, mapType.items, isJson = isJson, jsonSerdeLib, targetScala3)
+          mapSchemaTypeToType(
+            addName(parentName, key),
+            "item",
+            required = true,
+            mapType.items,
+            isJson = isJson,
+            isForm = isForm,
+            jsonSerdeLib,
+            targetScala3
+          )
         (s"Map[String, $innerType]" -> mapType.nullable, maybeEnum)
 
       case arrayType: OpenapiSchemaArray =>
@@ -338,6 +385,7 @@ class ClassDefinitionGenerator {
             required = true,
             arrayType.items,
             isJson = isJson,
+            isForm = isForm,
             jsonSerdeLib,
             targetScala3
           )
@@ -351,7 +399,8 @@ class ClassDefinitionGenerator {
           targetScala3,
           Set.empty,
           jsonSerdeLib,
-          if (isJson) Set(enumName) else Set.empty
+          if (isJson) Set(enumName) else Set.empty,
+          if (isForm) Set(enumName) else Set.empty
         )
         (enumName -> e.nullable, Some(InlineEnumDefn(enumName, enumDefn.mkString("\n"))))
 

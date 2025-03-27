@@ -45,6 +45,16 @@ object TapirGeneratedEndpoints {
   implicit def makeExplodedQuerySeqCodecFromListSeq[T](implicit support: sttp.tapir.Codec[List[String], List[T], sttp.tapir.CodecFormat.TextPlain]): sttp.tapir.Codec[List[String], ExplodedValues[T], sttp.tapir.CodecFormat.TextPlain] = {
     support.mapDecode(l => DecodeResult.Value(ExplodedValues(l)))(_.values)
   }
+  implicit def makeFormBodySeqCodecFromListCodec[T](implicit support: sttp.tapir.Codec[List[String], List[T], sttp.tapir.CodecFormat.TextPlain]): sttp.tapir.Codec[List[String], Seq[T], sttp.tapir.CodecFormat.TextPlain] = {
+    support.map[Seq[T]]((_: List[T]).toSeq)((_: Seq[T]).toList)
+  }
+  implicit def makeFormBodyOptSeqCodecFromSupport[T](implicit support: ExtraParamSupport[T]): sttp.tapir.Codec[List[String], Option[Seq[T]], sttp.tapir.CodecFormat.TextPlain] = {
+    sttp.tapir.Codec.listHeadOption[String, String, sttp.tapir.CodecFormat.TextPlain]
+      .mapDecode {
+        case None => DecodeResult.Value(None)
+        case Some(s) => DecodeResult.sequence(java.net.URLDecoder.decode(s).split(",").toSeq.map(support.decode)).map(Some(_))
+      }(_.map(s => java.net.URLEncoder.encode(s.map(support.encode).mkString(","))))
+  }
   implicit class RichBody[A, T](bod: EndpointIO.Body[A, T]) {
     def widenBody[TT >: T]: EndpointIO.Body[A, TT] = bod.map(_.asInstanceOf[TT])(_.asInstanceOf[T])
   }
