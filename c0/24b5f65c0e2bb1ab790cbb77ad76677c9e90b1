@@ -1,0 +1,18 @@
+openapi-codegen/core/src/main/scala/sttp/tapir/codegen/openapi/models/OpenapiSchemaType.scala
+  h_ae3f3decc5f677 283-304,311-314
+openapi-codegen/sbt-plugin/src/sbt-test/sbt-openapi-codegen/oneOf-json-roundtrip/swagger.yaml
+  h_ae3f3decc5f677 1147-1148
+openapi-codegen/sbt-plugin/src/sbt-test/sbt-openapi-codegen/oneOf-json-roundtrip/ExpectedValidators.scala.txt
+  h_ae3f3decc5f677 112,141-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c024b5f65c0e2bb1ab790cbb77ad76677c9e90b1",
+  "prompts": {},
+  "humans": {
+    "h_ae3f3decc5f677": {
+      "author": "Hugh Simpson <hsimpson@rzsoftware.com>"
+    }
+  }
+}
