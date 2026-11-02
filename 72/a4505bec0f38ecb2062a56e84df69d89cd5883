@@ -1,0 +1,14 @@
+openapi-codegen/core/src/main/scala/sttp/tapir/codegen/openapi/models/OpenapiSchemaType.scala
+  h_ae3f3decc5f677 302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "72a4505bec0f38ecb2062a56e84df69d89cd5883",
+  "prompts": {},
+  "humans": {
+    "h_ae3f3decc5f677": {
+      "author": "Hugh Simpson <hsimpson@rzsoftware.com>"
+    }
+  }
+}
